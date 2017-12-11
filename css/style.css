@@ -660,6 +660,7 @@ code {
   margin: 10px auto 20px;
   width: 128px;
   height: 128px;
+  border-radius: 50%;
 }
 #profile .inner .base-info #name,
 #profile .inner .base-info #title,
