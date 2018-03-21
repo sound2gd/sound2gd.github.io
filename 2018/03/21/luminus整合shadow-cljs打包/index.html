@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>luminus整合shadow-cljs打包 | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
+<meta name="keywords" content="clojure">
+<meta property="og:type" content="article">
+<meta property="og:title" content="luminus整合shadow-cljs打包">
+<meta property="og:url" content="http://sound2gd.wang/2018/03/21/luminus整合shadow-cljs打包/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2018-03-21T15:23:00.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="luminus整合shadow-cljs打包">
+<meta name="twitter:description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                3
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                2
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-luminus整合shadow-cljs打包" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            luminus整合shadow-cljs打包
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2018/03/21/luminus整合shadow-cljs打包/">
+            <time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/clojure/">clojure</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/clojure/">clojure</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p><a href="https://github.com/thheller/shadow-cljs" target="_blank" rel="noopener">shadow-cljs</a>是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:</p>
+<ol>
+<li>支持直接引用npm依赖, 以前还需要使用<code>cljsjs</code>转一次，不仅麻烦而且还是过时的</li>
+<li>和webpack类似的代码分割, 依赖</li>
+</ol>
+<p>当然，<strong>cljs+css代码重载</strong>是最基本的，而且构建速度也足够快<br><a id="more"></a></p>
+<p>基于这些特点，打算采用<code>shadow-cljs</code>来编译cljs<br>想法是好的，实际运行的发现现实总是骨感的…</p>
+<h2 id="1-安装shadow-cljs"><a href="#1-安装shadow-cljs" class="headerlink" title="1. 安装shadow-cljs"></a>1. 安装shadow-cljs</h2><p>我先创建了一个<code>luminus</code>的应用，然后按照shadow-cljs官网所说，直接安装跑起来</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">lein new luminus shadow-gen</span><br><span class="line"><span class="built_in">cd</span> shadow-gen</span><br><span class="line">yarn add shadow-cljs</span><br><span class="line">shadow-cljs init</span><br></pre></td></tr></table></figure>
+<h2 id="2-shadow-cljs打包配置"><a href="#2-shadow-cljs打包配置" class="headerlink" title="2. shadow-cljs打包配置"></a>2. shadow-cljs打包配置</h2><p>然后我创建一个Build配置</p>
+<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">;; shadow-cljs configuration</span></span><br><span class="line">&#123;<span class="symbol">:source-paths</span></span><br><span class="line"> [<span class="string">"src/cljs"</span> <span class="string">"env/dev/cljs/"</span>]</span><br><span class="line"> <span class="symbol">:dependencies</span></span><br><span class="line"> [[org.clojure/clojurescript <span class="string">"1.9.946"</span>]</span><br><span class="line">  [re-frame <span class="string">"0.10.5"</span>]</span><br><span class="line">  [reagent <span class="string">"0.7.0"</span>]</span><br><span class="line">  [secretary <span class="string">"1.2.3"</span>]</span><br><span class="line">  [cljs-ajax <span class="string">"0.7.3"</span>]</span><br><span class="line">  [day8.re-frame/re-frame-10x <span class="string">"0.2.0"</span>]]</span><br><span class="line"> <span class="symbol">:verbose</span> <span class="literal">true</span></span><br><span class="line"> <span class="symbol">:builds</span></span><br><span class="line"> &#123;<span class="symbol">:app</span> &#123;<span class="symbol">:target</span> <span class="symbol">:browser</span></span><br><span class="line">        <span class="symbol">:output-dir</span> <span class="string">"target/cljsbuild/public/js"</span></span><br><span class="line">        <span class="symbol">:asset-path</span> <span class="string">"/js"</span></span><br><span class="line">        <span class="symbol">:dev</span></span><br><span class="line">        &#123;<span class="symbol">:compiler-options</span> &#123;<span class="symbol">:closure-warnings</span> &#123;<span class="symbol">:global-this</span> <span class="symbol">:off</span>&#125;</span><br><span class="line">                            <span class="symbol">:closure-defines</span> &#123;<span class="string">"re_frame.trace.trace_enabled_QMARK_"</span> <span class="literal">true</span>&#125;</span><br><span class="line">                            <span class="symbol">:source-map</span> <span class="literal">true</span></span><br><span class="line">                            <span class="symbol">:optimizations</span> <span class="symbol">:none</span></span><br><span class="line">                            <span class="symbol">:pretty-print</span> <span class="literal">true</span>&#125;&#125;</span><br><span class="line">        <span class="symbol">:release</span></span><br><span class="line">        &#123;<span class="symbol">:compiler-options</span> &#123;<span class="symbol">:optimizations</span> <span class="symbol">:advanced</span></span><br><span class="line">                            <span class="symbol">:pretty-print</span> <span class="literal">false</span></span><br><span class="line">                            <span class="symbol">:closure-warnings</span></span><br><span class="line">                           &#123;<span class="symbol">:externs-validation</span> <span class="symbol">:off</span> <span class="symbol">:non-standard-jsdoc</span> <span class="symbol">:off</span>&#125;&#125;&#125;</span><br><span class="line">        <span class="symbol">:modules</span> &#123;<span class="symbol">:app</span> &#123;<span class="symbol">:entries</span> [shadow-gen.app]&#125;&#125;</span><br><span class="line">        <span class="symbol">:devtools</span> &#123;<span class="symbol">:after-load</span> shadow-gen.core/mount-components</span><br><span class="line">                   <span class="symbol">:preloads</span> [day8.re-frame-10x.preload]</span><br><span class="line">                   &#125;</span><br><span class="line">        &#125;&#125;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<p>开了<code>day8.re-frame-10x.preload</code>半天页面一直崩，问了下作者thheller发现reframe的dev工具有bug,现在还无解…<br>然后<code>lein repl</code>,start之后，访问一下<code>localhost:3000</code>, 一开始是好的，后来改下代码hmr之后发现果然崩了。。</p>
+<p>打开app.cljs一看，由于<code>figwheel-no-load</code>元数据, figwheel每次重载都会避开app.cljs,</p>
+<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">(<span class="name"><span class="builtin-name">ns</span></span> ^<span class="symbol">:figwheel-no-load</span> shadow-gen.app</span><br><span class="line">  (<span class="symbol">:require</span> [shadow-gen.core <span class="symbol">:as</span> core]</span><br><span class="line">            [devtools.core <span class="symbol">:as</span> devtools]))</span><br><span class="line"></span><br><span class="line"><span class="comment">;; shadow-gen自带了devtool不需要这些了</span></span><br><span class="line"><span class="comment">;; (enable-console-print!)</span></span><br><span class="line"><span class="comment">;; (devtools/install!)</span></span><br><span class="line"></span><br><span class="line">(<span class="name">core/init!</span>)</span><br></pre></td></tr></table></figure>
+<p>shadow-gen不会skip,<strong>每次都会reload整个ns</strong>,然后init!的时候会重复创建goog.History对象，就崩了，<br>跟作者提了下，作者当天就把这个功能加上去了。。。</p>
+<p>后来请教了下赵宇少侠，发现把core.cljs里的init!导出，然后在html引的时候<strong>直接调用core里的init</strong>也是一种很好的解决方案,<br>然后把entry改成core.cljs,每次重载的时候调用edn里配置的<code>:after-load</code>去mount就好了<br><figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;% script "/js/app.js" %&#125;</span><br><span class="line"><span class="tag">&lt;<span class="name">script</span> <span class="attr">type</span>=<span class="string">"text/javascript"</span>&gt;</span><span class="undefined"></span></span><br><span class="line"><span class="undefined"> var context = "&#123;&#123;servlet-context&#125;&#125;";</span></span><br><span class="line"><span class="undefined"> var csrfToken = "&#123;&#123;csrf-token&#125;&#125;";</span></span><br><span class="line"><span class="undefined"> shadow_gen.core.init_BANG_(); // 加了这行</span></span><br><span class="line"><span class="undefined"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure></p>
+<h2 id="3-整合leiningen"><a href="#3-整合leiningen" class="headerlink" title="3. 整合leiningen"></a>3. 整合leiningen</h2><p>这样打包基本就ok了，怎么和lein这个呢，我的代码里既有java代码，又有clj和cljs代码<br>一开始我是先编译cljs的</p>
+<pre><code>shadow-cljs release app
+</code></pre><p>然后发现leiningen在编译的时候，直接会清空target目录…<br>翻了下leiningen文档，发现在pretask里可以指定任务顺序，我的是先编译java,然后编译clj,最后使用<code>shadow.cljs.devtools.cli</code>编译cljs<br>lein里面javac可以编译java,compile编译clj, 去掉原来的<code>:cljsbuild</code>最后配置是这样</p>
+<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="symbol">:uberjar</span> &#123;<span class="symbol">:omit-source</span> <span class="literal">true</span></span><br><span class="line">             <span class="symbol">:main</span> ^<span class="symbol">:skip-aot</span> shadow-gen.core</span><br><span class="line">             <span class="symbol">:prep-tasks</span> [<span class="string">"javac"</span> <span class="string">"compile"</span> [<span class="string">"run"</span> <span class="string">"-m"</span> <span class="string">"shadow.cljs.devtools.cli"</span> <span class="string">"release"</span> <span class="string">"app"</span>]]</span><br><span class="line">             <span class="symbol">:aot</span> <span class="symbol">:all</span></span><br><span class="line">             <span class="symbol">:uberjar-name</span> <span class="string">"shadow-gen.jar"</span></span><br><span class="line">             <span class="symbol">:source-paths</span> [<span class="string">"env/prod/clj"</span>]</span><br><span class="line">             <span class="symbol">:resource-paths</span> [<span class="string">"env/prod/resources"</span>]&#125;&#125;</span><br></pre></td></tr></table></figure>
+<p>这样就大功告成了! 成功把shadow-cljs和leiningen整合，完美java,clj,cljs混编!</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2017/12/15/使用clj1-9快速启动repl/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">使用clj1.9快速启动clojure的repl</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/clojure/">clojure</a></p>
+                            <p class="item-title"><a href="/2018/03/21/luminus整合shadow-cljs打包/" class="title">luminus整合shadow-cljs打包</a></p>
+                            <p class="item-date"><time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/clojure/">clojure</a></p>
+                            <p class="item-title"><a href="/2017/12/15/使用clj1-9快速启动repl/" class="title">使用clj1.9快速启动clojure的repl</a></p>
+                            <p class="item-date"><time datetime="2017-12-14T16:00:00.000Z" itemprop="datePublished">2017-12-15</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/诗词鉴赏/">诗词鉴赏</a></p>
+                            <p class="item-title"><a href="/2017/12/11/蜀道难/" class="title">蜀道难</a></p>
+                            <p class="item-date"><time datetime="2017-12-11T07:45:38.000Z" itemprop="datePublished">2017-12-11</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/clojure/" style="font-size: 20px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2018 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
