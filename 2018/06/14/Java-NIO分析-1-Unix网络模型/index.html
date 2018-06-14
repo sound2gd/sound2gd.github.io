@@ -3,18 +3,26 @@
 <head>
     <meta charset="utf-8">
     
-    <title>归档: 2018 | Sound2gd的博客</title>
+    <title>Java NIO分析(1): Unix网络模型 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="sound2gd的博客">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Sound2gd的博客">
-<meta property="og:url" content="http://sound2gd.wang/archives/2018/index.html">
+    <meta name="description" content="要谈Java的NIO, 还是先从I/O开始说起。Unix提供了5种不同的I/O模型，分别是  阻塞I/O(blocking I/O) 非阻塞I/O(non-blocking I/O) I/O复用(I/O multiplexing) 信号驱动式I/O(signal-driven I/O) 异步I/O(asynchronous I/O)">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(1): Unix网络模型">
+<meta property="og:url" content="http://sound2gd.wang/2018/06/14/Java-NIO分析-1-Unix网络模型/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="sound2gd的博客">
+<meta property="og:description" content="要谈Java的NIO, 还是先从I/O开始说起。Unix提供了5种不同的I/O模型，分别是  阻塞I/O(blocking I/O) 非阻塞I/O(non-blocking I/O) I/O复用(I/O multiplexing) 信号驱动式I/O(signal-driven I/O) 异步I/O(asynchronous I/O)">
 <meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614162220.png">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614163211.png">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614164628.png">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614165238.png">
+<meta property="og:updated_time" content="2018-06-14T09:09:10.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sound2gd的博客">
-<meta name="twitter:description" content="sound2gd的博客">
+<meta name="twitter:title" content="Java NIO分析(1): Unix网络模型">
+<meta name="twitter:description" content="要谈Java的NIO, 还是先从I/O开始说起。Unix提供了5种不同的I/O模型，分别是  阻塞I/O(blocking I/O) 非阻塞I/O(non-blocking I/O) I/O复用(I/O multiplexing) 信号驱动式I/O(signal-driven I/O) 异步I/O(asynchronous I/O)">
+<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png">
     
 
     
@@ -183,25 +191,21 @@
 </aside>
 
             
-            <section id="main"><div class="timeline timeline-wrap">
-    
-            <div class="timeline-row timeline-row-major">
-                <span class="node"><i class="fa fa-calendar"></i></span>
-                <h1 class="title">2018</h1>
-            </div>
+            <section id="main"><article id="post-Java-NIO分析-1-Unix网络模型" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
         
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+        
+            <header class="article-header">
                 
     
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/06/14/Java-NIO分析-1-Unix网络模型/">Java NIO分析(1): Unix网络模型</a>
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(1): Unix网络模型
         </h1>
     
 
-                <div class="article-meta">
-                    
+                
+                    <div class="article-meta">
+                        
     <div class="article-date">
         <i class="fa fa-calendar"></i>
         <a href="/2018/06/14/Java-NIO分析-1-Unix网络模型/">
@@ -210,59 +214,171 @@
     </div>
 
 
-                    
+                        
     <div class="article-category">
     	<i class="fa fa-folder"></i>
         <a class="article-category-link" href="/categories/Java/">Java</a>
     </div>
 
-                    
+                        
     <div class="article-tag">
         <i class="fa fa-tag"></i>
         <a class="tag-link" href="/tags/NIO/">NIO</a>
     </div>
 
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+                    </div>
                 
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/03/21/luminus整合shadow-cljs打包/">luminus整合shadow-cljs打包</a>
-        </h1>
-    
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>要谈Java的NIO, 还是先从I/O开始说起。<br>Unix提供了5种不同的I/O模型，分别是</p>
+<ul>
+<li>阻塞I/O(blocking I/O)</li>
+<li>非阻塞I/O(non-blocking I/O)</li>
+<li>I/O复用(I/O multiplexing)</li>
+<li>信号驱动式I/O(signal-driven I/O)</li>
+<li>异步I/O(asynchronous I/O)</li>
+</ul>
+<a id="more"></a>
+<p>一个I/O操作需要从用户态进入内核态运行,通常包括俩阶段</p>
+<ol>
+<li>等待数据</li>
+<li>从内核向进程复制数据</li>
+</ol>
+<p>对于socket I/O而言，第一步通常是等待数据从网络中到达，到达之后会复制到内核的某个缓冲区<br>第二布就是从内核缓冲区复制到应用进程缓冲区</p>
+<h2 id="阻塞I-O"><a href="#阻塞I-O" class="headerlink" title="阻塞I/O"></a>阻塞I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png" alt=""></p>
+<p>默认情况下，所有的socket都是阻塞的. 如图所示</p>
+<ol>
+<li>应用发起recvfrom这个系统调用, 应用被阻塞</li>
+<li>内核等待数据准备好</li>
+<li>数据准备好, 内核将数据复制到应用缓冲区</li>
+<li>应用从阻塞里恢复，处理数据</li>
+</ol>
+<p>这也是理解和编程起来比较简单的模型，所以计算机早期用的很多,现在在处理超大文件的时候，也依然适用于这种模型。</p>
+<h2 id="非阻塞I-O"><a href="#非阻塞I-O" class="headerlink" title="非阻塞I/O"></a>非阻塞I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614162220.png" alt=""></p>
+<p>相比于<code>Blocking I/O</code>, <code>Non-Blocking I/O</code>的<strong>等待数据</strong>阶段不会被阻塞，也就是说操作系统不会挂起应用, 应用<br>不断<code>轮询(polling)</code>内核看是否数据准备好。某次轮询发现准备好了，再直接发系统调用阻塞取数据.</p>
+<p><code>Unix网络编程</code>里对<code>轮询</code>的定义是:<br><strong>应用进程对非阻塞描述符循环发送系统调用，以查看某个操作是否就绪</strong></p>
+<h2 id="I-O多路复用"><a href="#I-O多路复用" class="headerlink" title="I/O多路复用"></a>I/O多路复用</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614163211.png" alt=""><br>在处理非常多的描述符的时候，I/O多路复用技术显得非常有用。I/O多路复用需要发送2次系统调用:</p>
+<ol>
+<li>select或者poll, 获取可读条件, 等待描述符变成可读</li>
+<li>发起recvfrom系统调用，内核复制数据到应用。</li>
+</ol>
+<p>在只有1个客户端的时候，I/O多路复用技术甚至不如阻塞I/O.因为多发了一次系统调用。<br>但有些常用的网络场景，如:</p>
+<ul>
+<li>既要处理TCP,又要处理UDP</li>
+<li>一个服务器处理多个服务或者多个协议</li>
+<li>一个TCP服务器既要监听socket，又要处理已连接socket</li>
+</ul>
+<p>这些场景下，多发的这次系统调用能带来更高的I/O处理效率，能更均匀的使用服务器时间片, 处理更多连接。<br>常用的方法是把I/O多路复用和非阻塞I/O结合使用，这样应用进程不需要阻塞，能处理别的业务，同时又能够处理多个I/O请求</p>
+<h2 id="信号驱动I-O"><a href="#信号驱动I-O" class="headerlink" title="信号驱动I/O"></a>信号驱动I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614164628.png" alt=""></p>
+<p>信号模型的步骤是:</p>
+<ol>
+<li>应用进程发起一个信号，告诉内核要什么文件，然后立马返回</li>
+<li>内核准备好数据</li>
+<li>应用进程收到信号发起recvfrom系统调用来阻塞取数据</li>
+</ol>
+<p>信号驱动模型类似于你去一点点买奶茶，对方给你一个小票。<br>什么时候好了对方喊xx号(这就是信号)好了.然后你来取奶茶(recvfrom取数据)</p>
+<h2 id="异步I-O"><a href="#异步I-O" class="headerlink" title="异步I/O"></a>异步I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614165238.png" alt=""></p>
+<p>步骤：</p>
+<ol>
+<li>应用进程发起aio_read系统调用，告诉内核要什么文件，然后立马返回</li>
+<li>内核准备好数据, copy到应用进程, 然后给应用进程发aio_read指定的信号</li>
+<li>应用进程收到信号，开始处理数据,整个过程应用进程都没有被阻塞</li>
+</ol>
+<p>AIO模型是比较高效的, 异步非阻塞，从各个方面来说都是。但是编程难度比较大(和人的思维惯性相左)，代码写起来不易维护，可能未来会火吧。目前I/O多路复用已经足够用了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>前四种模型的区别主要在第一阶段， 第二阶段recvfrom将数据从内核复制到应用的缓冲区期间，都会阻塞应用进程。<br>而异步I/O模型在两个阶段都要处理.</p>
+<p><code>Non-Blocking I/O</code>和<code>Signal-Driven I/O</code>在数据准备阶段都不会阻塞，前者要轮询内核数据是否准备好，后者是直接等待内核通知回调<br><code>Asynchronous I/O</code>是在真正意义上的<code>POSIX</code>定义的异步io操作, 在数据准备和复制阶段都不会阻塞应用,但是编程难度大<br><code>I/O Multiplexing</code>在数据准备阶段也会阻塞，但是可以处理更多I/O请求，也就是说加了层中间人抽象，虽然阻塞了应用进程，但是能知道多个fd可读可写,也是大名鼎鼎的<code>reactor模式</code>的基础</p>
 
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/03/21/luminus整合shadow-cljs打包/">
-            <time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/clojure/">clojure</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/clojure/">clojure</a>
-    </div>
-
-                </div>
-            </div>
+        
         </div>
-    
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
 </div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/03/21/luminus整合shadow-cljs打包/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">luminus整合shadow-cljs打包</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
 </section>
             
                 
