@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Java NIO分析(3): I/O多路复用之select系统调用 | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="前面讲了一些Java NIO分析(2): I/O多路复用历史杂谈, 谈到了多路复用的发展历史以及为什么需要它。今天讲广受各大内核支持的select系统调用,select允许进程指定内核等待1个或者多个事件的任何一个发生, 并且只在有它们发生之后或者等待一段时间后才唤醒进程。">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(3): I&#x2F;O多路复用之select系统调用">
+<meta property="og:url" content="http://sound2gd.wang/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="前面讲了一些Java NIO分析(2): I/O多路复用历史杂谈, 谈到了多路复用的发展历史以及为什么需要它。今天讲广受各大内核支持的select系统调用,select允许进程指定内核等待1个或者多个事件的任何一个发生, 并且只在有它们发生之后或者等待一段时间后才唤醒进程。">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2018-06-28T06:56:29.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Java NIO分析(3): I&#x2F;O多路复用之select系统调用">
+<meta name="twitter:description" content="前面讲了一些Java NIO分析(2): I/O多路复用历史杂谈, 谈到了多路复用的发展历史以及为什么需要它。今天讲广受各大内核支持的select系统调用,select允许进程指定内核等待1个或者多个事件的任何一个发生, 并且只在有它们发生之后或者等待一段时间后才唤醒进程。">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                6
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                3
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-Java-NIO分析-3-I-O多路复用之select系统调用" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(3): I/O多路复用之select系统调用
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/">
+            <time datetime="2018-06-28T01:48:07.000Z" itemprop="datePublished">2018-06-28</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/Java/">Java</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/NIO/">NIO</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>前面讲了一些<a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" title="Java NIO分析(2): I/O多路复用历史杂谈">Java NIO分析(2): I/O多路复用历史杂谈</a>, 谈到了多路复用的发展历史<br>以及为什么需要它。今天讲广受各大内核支持的<code>select</code>系统调用,<code>select</code>允许进程<br>指定内核等待1个或者多个事件的任何一个发生, 并且只在有它们发生之后或者等待一段时间后才唤醒进程。</p>
+<a id="more"></a>
+<h1 id="1-select介绍"><a href="#1-select介绍" class="headerlink" title="1. select介绍"></a>1. select介绍</h1><p>使用select, 我们即使应用进程里只有1个线程也能够接受多个连接并且做出处理,<br>因为应用进程不需要阻塞在socket的read,write或者accept系统调用上, 而是<br>内核告诉应用有事件到来了, 应用进程遍历<code>fd_set</code>看是哪个<code>fd</code>就绪了，然后再处理</p>
+<p><code>fd_set</code>称为<code>描述符集</code>，通常是一个整数数组，其中<strong>每个整数的每一位对应1个描述符的状态</strong>.</p>
+<p>select的函数签名是:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/select.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/time.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">select</span><span class="params">(<span class="keyword">int</span> maxfdpl, fd_set *readset, fd_set *writeset,</span></span></span><br><span class="line"><span class="function"><span class="params">           fd_set *exceptset, <span class="keyword">const</span> struct timeval *timeout)</span></span></span><br></pre></td></tr></table></figure>
+<p>其中，返回值表示<code>fd_set</code>里就绪的元素总个数,包括读,写,异常<code>fd_set</code><br>第一个参数表示待测试的fd个数,值一般是待测试的fd总数+1<br>中间仨代表要监听的读set, 写set和异常set<br>最后一个参数代表select每个fd经历的时间</p>
+<p>操作<code>描述符集</code>的方法是4个宏:</p>
+<ul>
+<li>FD_ZERO 清除fdset里的所有位</li>
+<li>FD_SET 开启某fd在fdset里对应的位, 一般就置1</li>
+<li>FD_CLR 清除某fd在fdset里对应的位, 一般就置0</li>
+<li>FD_ISSET 判断fdset里是否包含某个fd的位</li>
+</ul>
+<p><strong>socket描述符</strong>的读就绪条件有:</p>
+<ul>
+<li>该socket的读缓冲区的数据字节数 &gt;= 读缓冲区低水位标记的当前大小</li>
+<li>连接的读半关闭(FIN)</li>
+<li>socket是监听socket且已完成的连接数不为0</li>
+<li>socket有异常需要处理</li>
+</ul>
+<p><strong>socket描述符</strong>的写就绪条件有:</p>
+<ul>
+<li>该socket的发送缓冲区的可用空间字节数 &gt;= socket发送缓冲区低水位的大小</li>
+<li>连接的写半关闭</li>
+<li>使用非阻塞式的connect的socket已建立连接</li>
+<li>socket有异常要处理</li>
+</ul>
+<p>通俗点说就是， 缓冲区是一个大小为n的仓库，数据是货物。<br>读缓冲区就类似于，你去取货，首先要货物有一定数量(读缓冲区低水位标记), 不然就拿不到货了<br>写缓冲区好比，你要把货物入库，仓库得还有剩余空间(写缓冲区低水位标记), 不然仓库放不下</p>
+<h1 id="2-select写server实战"><a href="#2-select写server实战" class="headerlink" title="2. select写server实战"></a>2. select写server实战</h1><p>下面是一个使用c写的<code>echo server</code>示例，可以直接编译运行</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gcc -o select ./select.c</span><br><span class="line">./select</span><br></pre></td></tr></table></figure>
+<p>主要有5个步骤</p>
+<ol>
+<li>新建socket, 用于监听端口</li>
+<li>socket的fd绑定端口</li>
+<li>socket监听</li>
+<li>初始化fd_set</li>
+<li>发起select系统调用获取所有fd_set，寻找和处理事件</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/select.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 1. 新建socket, 用于监听端口</span></span><br><span class="line">    <span class="keyword">int</span> listenfd = socket(AF_INET, SOCK_STREAM, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenfd == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"创建socket失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 绑定端口</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">short</span> listenPort = <span class="number">8090</span>;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">servaddr</span>;</span></span><br><span class="line">    <span class="built_in">memset</span>(&amp;servaddr, <span class="number">0</span>, <span class="keyword">sizeof</span>(servaddr));</span><br><span class="line">    servaddr.sin_family = AF_INET;</span><br><span class="line">    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);</span><br><span class="line">    servaddr.sin_port = htons(listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> on = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 设置socket绑定的端口，再程序关闭之后可以重复使用</span></span><br><span class="line">    <span class="keyword">if</span> ((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &amp;on, <span class="keyword">sizeof</span>(<span class="keyword">int</span>))) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> bindRet = bind(listenfd, (struct sockaddr *) &amp;servaddr, <span class="keyword">sizeof</span>(servaddr));</span><br><span class="line">    <span class="keyword">if</span> (bindRet == <span class="number">-1</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"socket绑定地址失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 监听端口</span></span><br><span class="line">    <span class="keyword">int</span> listenRet = listen(listenfd, <span class="number">10</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenRet == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"socket监听端口失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"socket 监听完毕, 地址: 127.0.0.1:%d"</span>, listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 初始化fd_set</span></span><br><span class="line">    <span class="keyword">int</span> client[FD_SETSIZE]; <span class="comment">// 保存已连接fd</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; FD_SETSIZE; ++i) &#123;</span><br><span class="line">        client[i] = <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> maxfd = listenfd, i, maxi = <span class="number">-1</span>, MAXLEN = <span class="number">1024</span>;</span><br><span class="line">    <span class="keyword">char</span> buf[MAXLEN];</span><br><span class="line"></span><br><span class="line">    fd_set rset, allset; <span class="comment">// fd_set代表的是描述符集，本质上是一个整数, 根据操作系统的不同有可能是64位或者32位，通过每位的0或者1来判断fd是否就绪</span></span><br><span class="line">    FD_ZERO(&amp;allset); <span class="comment">// 清零</span></span><br><span class="line">    FD_SET(listenfd, &amp;allset); <span class="comment">// 把listenfd加入到allset</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"ready"</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">        rset = allset;</span><br><span class="line">        <span class="comment">// 函数签名int select(int maxfdpl, fd_set *readset, fd_set *writeset, fd_set *exceptset, const struct timeval *timeout)</span></span><br><span class="line">        <span class="comment">// 返回值表示fd_set里就绪的元素总个数,包括读,写,异常fd_set</span></span><br><span class="line">        <span class="comment">// 第一个参数表示待测试的fd个数,值一般是待测试的fd总数+1</span></span><br><span class="line">        <span class="comment">// 中间仨代表要监听的读set, 写set和异常set</span></span><br><span class="line">        <span class="comment">// 最后一个参数代表select每个fd经历的时间</span></span><br><span class="line">        <span class="comment">// 5. select获取 连接fd,断开连接fd, 有数据可读fd</span></span><br><span class="line">        <span class="keyword">int</span> nready = select(maxfd + <span class="number">1</span>, &amp;rset, <span class="literal">NULL</span>, <span class="literal">NULL</span>, <span class="literal">NULL</span>);</span><br><span class="line">        <span class="keyword">if</span> (FD_ISSET(listenfd, &amp;rset)) &#123; <span class="comment">// 接受新连接</span></span><br><span class="line">            <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">clientaddr</span>;</span></span><br><span class="line">            <span class="keyword">int</span> clilen = <span class="keyword">sizeof</span>(clientaddr);</span><br><span class="line">            <span class="keyword">int</span> connfd = accept(listenfd, (struct sockaddr *) &amp;clientaddr, &amp;clilen);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 保存</span></span><br><span class="line">            <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; FD_SETSIZE; ++i) &#123;</span><br><span class="line">                <span class="keyword">if</span> (client[i] &lt; <span class="number">0</span>) &#123;</span><br><span class="line">                    client[i] = connfd;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (i == FD_SETSIZE) <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line"></span><br><span class="line">            FD_SET(connfd, &amp;allset);</span><br><span class="line">            <span class="keyword">if</span> (connfd &gt; maxfd) maxfd = connfd;</span><br><span class="line">            <span class="keyword">if</span> (i &gt; maxi) maxi = i;</span><br><span class="line">            <span class="keyword">if</span> (--nready &lt;= <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt;= maxi; i++) &#123;</span><br><span class="line">            <span class="keyword">int</span> sockfd = client[i];</span><br><span class="line">            <span class="keyword">if</span> (sockfd &lt; <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (FD_ISSET(sockfd, &amp;rset)) &#123;</span><br><span class="line">                <span class="keyword">int</span> n = recv(sockfd, buf, MAXLEN, <span class="number">0</span>);</span><br><span class="line">                <span class="keyword">if</span> (n == <span class="number">0</span>) &#123; <span class="comment">// 读到0表示连接关闭</span></span><br><span class="line">                    close(sockfd);</span><br><span class="line">                    FD_CLR(sockfd, &amp;allset);</span><br><span class="line">                    client[i] = <span class="number">-1</span>;</span><br><span class="line">                &#125; <span class="keyword">else</span> write(sockfd, buf, n);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (--nready == <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后使用任何tcp测试工具都能测， 例如好用的<code>nc</code>, 多开几个终端用nc去发消息，程序也能正常处理</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nc localhost 8090</span><br></pre></td></tr></table></figure>
+<h1 id="3-select总结"><a href="#3-select总结" class="headerlink" title="3. select总结"></a>3. select总结</h1><p>select是早期berkly随着tcp/ip协议栈一起发出来的。有非常良好的兼容性，各个平台都支持,<br>是早期I/O多路复用比较好的方案</p>
+<p>select的fd_size(最大描述符数)只有1024, 是在头文件里用宏写死的,<br>早期bsd内核最多只能开20个进程，在当时看来1024长度的fd_set已经大到用不完了, 放在今天肯定是不够了</p>
+<p>一旦fd_set里任意fd上有事件发生，内核会立刻返回，将数据从内核空间拷贝到用户空间，然后应用进程需要遍历整个<br>fd_set去寻找哪个fd有事件了。</p>
+<p>所以，select的缺点主要有:</p>
+<ol>
+<li>最大并发限制: 1024个描述符</li>
+<li>内核/用户空间的fd_set数据拷贝</li>
+<li>遍历整个fd_set集合效率低，集合越大浪费的时间越多</li>
+</ol>
+<p>为了解决这些问题，后人主要有2个改进，分别是<code>poll</code>和<code>epoll</code>, 后面我们会讲到。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(2): I/O多路复用历史杂谈</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" class="title">Java NIO分析(3): I/O多路复用之select系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-06-28T01:48:07.000Z" itemprop="datePublished">2018-06-28</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" class="title">Java NIO分析(2): I/O多路复用历史杂谈</a></p>
+                            <p class="item-date"><time datetime="2018-06-17T01:32:06.000Z" itemprop="datePublished">2018-06-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/14/Java-NIO分析-1-Unix网络模型/" class="title">Java NIO分析(1): Unix网络模型</a></p>
+                            <p class="item-date"><time datetime="2018-06-14T03:12:00.000Z" itemprop="datePublished">2018-06-14</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/clojure/">clojure</a></p>
+                            <p class="item-title"><a href="/2018/03/21/luminus整合shadow-cljs打包/" class="title">luminus整合shadow-cljs打包</a></p>
+                            <p class="item-date"><time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/clojure/">clojure</a></p>
+                            <p class="item-title"><a href="/2017/12/15/使用clj1-9快速启动repl/" class="title">使用clj1.9快速启动clojure的repl</a></p>
+                            <p class="item-date"><time datetime="2017-12-14T16:00:00.000Z" itemprop="datePublished">2017-12-15</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Java/">Java</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO/">NIO</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/NIO/" style="font-size: 20px;">NIO</a> <a href="/tags/clojure/" style="font-size: 15px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2018 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
