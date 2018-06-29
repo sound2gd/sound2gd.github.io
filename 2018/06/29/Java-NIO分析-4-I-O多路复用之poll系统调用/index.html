@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Java NIO分析(4): I/O多路复用之poll系统调用 | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="poll系统调用主要解决了select系统调用的2个问题：  文件描述符数量(fd_setsize = 32)太小, 而且数值是使用宏写死的,这样在32位机器上最大文件描述符数量只有32*32=1024 文件描述符集(fd_set)这种值-结果参数的api设计不是很好, select系统调用的时候要分别传读set,写set，更多事件不好细分  poll系统调用使用了pollfd数据结构来表示事件数">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(4): I&#x2F;O多路复用之poll系统调用">
+<meta property="og:url" content="http://sound2gd.wang/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="poll系统调用主要解决了select系统调用的2个问题：  文件描述符数量(fd_setsize = 32)太小, 而且数值是使用宏写死的,这样在32位机器上最大文件描述符数量只有32*32=1024 文件描述符集(fd_set)这种值-结果参数的api设计不是很好, select系统调用的时候要分别传读set,写set，更多事件不好细分  poll系统调用使用了pollfd数据结构来表示事件数">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2018-06-29T10:18:26.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Java NIO分析(4): I&#x2F;O多路复用之poll系统调用">
+<meta name="twitter:description" content="poll系统调用主要解决了select系统调用的2个问题：  文件描述符数量(fd_setsize = 32)太小, 而且数值是使用宏写死的,这样在32位机器上最大文件描述符数量只有32*32=1024 文件描述符集(fd_set)这种值-结果参数的api设计不是很好, select系统调用的时候要分别传读set,写set，更多事件不好细分  poll系统调用使用了pollfd数据结构来表示事件数">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                7
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                3
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-Java-NIO分析-4-I-O多路复用之poll系统调用" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(4): I/O多路复用之poll系统调用
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/">
+            <time datetime="2018-06-29T03:46:02.000Z" itemprop="datePublished">2018-06-29</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/Java/">Java</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/NIO/">NIO</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p><code>poll</code>系统调用主要解决了<code>select</code>系统调用的2个问题：</p>
+<ol>
+<li>文件描述符数量(fd_setsize = 32)太小, 而且数值是使用宏写死的,这样在32位机器上最大文件描述符数量只有32*32=1024</li>
+<li>文件描述符集(fd_set)这种<code>值-结果参数</code>的api设计不是很好, select系统调用的时候要分别传读set,写set，更多事件不好细分</li>
+</ol>
+<p><code>poll</code>系统调用使用了pollfd数据结构来表示事件数组，没有了<code>fd_setsize</code>的限制,同时支持更多的事件类型</p>
+<a id="more"></a>
+<h1 id="1-pollfd结构"><a href="#1-pollfd结构" class="headerlink" title="1. pollfd结构"></a>1. pollfd结构</h1><p><code>pollfd</code>的结构是:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">pollfd</span> &#123;</span></span><br><span class="line">  <span class="keyword">int</span> fd; <span class="comment">// 需要检查的fd</span></span><br><span class="line">  <span class="keyword">short</span> events; <span class="comment">// 该fd感兴趣的事件</span></span><br><span class="line">  <span class="keyword">short</span> revents; <span class="comment">// 该fd当前发生的事件</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其中事件类型有很多，比如<code>POLLIN</code>代表可读，<code>POLLRDNORM</code>代表普通消息可读,<br>更多事件可以查看<a href="http://man7.org/linux/man-pages/man2/poll.2.html" target="_blank" rel="noopener">poll事件</a><br>相比于<code>select</code>可以更细化的监听事件, 同时分开使用字段来表示事件和结果(events和revents)。</p>
+<h1 id="2-poll函数"><a href="#2-poll函数" class="headerlink" title="2. poll函数"></a>2. poll函数</h1><p>poll函数的签名如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/poll.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">poll</span><span class="params">(struct pollfd *fdarray, <span class="keyword">unsigned</span> <span class="keyword">long</span> nfds, <span class="keyword">int</span> timeout)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>其中，第一个参数是指向1个pollfd结构数组的第一个元素的指针,第2个参数是pollfd数组元素的个数,<br>第三个参数是<code>poll</code>函数返回前等待多长时间，单位是毫秒。</p>
+<h1 id="3-poll版echo-server实例"><a href="#3-poll版echo-server实例" class="headerlink" title="3. poll版echo server实例"></a>3. poll版echo server实例</h1><p>使用poll函数来实现<code>echo server</code>, 整个过程依然还是分5步</p>
+<ol>
+<li>新建socket, 用于监听端口</li>
+<li>socket的fd绑定端口</li>
+<li>socket监听</li>
+<li>初始化pollfd数组</li>
+<li>发起poll系统调用获取所有pollfd，寻找和处理事件</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// Created by cris wang on 2018/6/28.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/poll.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/syslimits.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 1. 新建tcp流式socket</span></span><br><span class="line">    <span class="keyword">int</span> listenfd = socket(AF_INET, SOCK_STREAM, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenfd == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"创建socket失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 绑定端口</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">short</span> listenPort = <span class="number">8090</span>;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">servaddr</span>;</span></span><br><span class="line">    <span class="built_in">memset</span>(&amp;servaddr, <span class="number">0</span>, <span class="keyword">sizeof</span>(servaddr));</span><br><span class="line">    servaddr.sin_family = AF_INET;</span><br><span class="line">    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);</span><br><span class="line">    servaddr.sin_port = htons(listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> on = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">if</span> ((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &amp;on, <span class="keyword">sizeof</span>(<span class="keyword">int</span>)))) &#123;</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> bindRet = bind(listenfd, (struct sockaddr *) &amp;servaddr, <span class="keyword">sizeof</span>(servaddr));</span><br><span class="line">    <span class="keyword">if</span> (bindRet == <span class="number">-1</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"socket绑定地址失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 监听端口</span></span><br><span class="line">    <span class="keyword">int</span> listenRet = listen(listenfd, <span class="number">10</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenRet == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"socket监听端口失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"socket 监听完毕, 地址: 127.0.0.1:%d"</span>, listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 新建pollfd数组</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">pollfd</span> <span class="title">client</span>[<span class="title">OPEN_MAX</span>];</span></span><br><span class="line">    client[<span class="number">0</span>].fd = listenfd;</span><br><span class="line">    client[<span class="number">0</span>].events = POLL_IN;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; OPEN_MAX; i++) &#123;</span><br><span class="line">        client[i].fd = <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> maxi = <span class="number">0</span>, i = <span class="number">0</span>, MAXLEN = <span class="number">1024</span>;</span><br><span class="line">    <span class="keyword">char</span> buf[MAXLEN];</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 使用poll</span></span><br><span class="line">    <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">        <span class="keyword">int</span> nready = poll(client, (maxi + <span class="number">1</span>), <span class="number">-1</span>);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (client[<span class="number">0</span>].revents &amp; POLL_IN) &#123;</span><br><span class="line">            <span class="comment">// 接受新连接</span></span><br><span class="line">            <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">clientaddr</span>;</span></span><br><span class="line">            <span class="keyword">int</span> clilen = <span class="keyword">sizeof</span>(clientaddr);</span><br><span class="line">            <span class="keyword">int</span> connfd = accept(listenfd, (struct sockaddr *) &amp;clientaddr, &amp;clilen);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 找到pollfd数组里第一个可用的pollfd</span></span><br><span class="line">            <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; OPEN_MAX; i++) &#123;</span><br><span class="line">                <span class="keyword">if</span> (client[i].fd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">                    client[i].fd = connfd;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (i == OPEN_MAX) <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">            <span class="comment">// 设置fd感兴趣的事件</span></span><br><span class="line">            client[i].events = POLL_MSG;</span><br><span class="line">            <span class="keyword">if</span> (i &gt; maxi) maxi = i;</span><br><span class="line">            <span class="keyword">if</span> (--nready &lt;= <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (i = <span class="number">1</span>; i &lt;= maxi; i++) &#123;</span><br><span class="line">            <span class="class"><span class="keyword">struct</span> <span class="title">pollfd</span> <span class="title">sockfd</span> = <span class="title">client</span>[<span class="title">i</span>];</span></span><br><span class="line">            <span class="keyword">if</span> (sockfd.fd &lt; <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (sockfd.revents &amp; (POLL_MSG | POLL_ERR)) &#123;</span><br><span class="line">                <span class="keyword">int</span> n = recv(sockfd.fd, buf, MAXLEN, <span class="number">0</span>);</span><br><span class="line">                <span class="keyword">if</span> (n == <span class="number">0</span> || n &lt; <span class="number">0</span>) &#123;<span class="comment">// 0表示连接关闭 &lt;0表示连接重置</span></span><br><span class="line">                    close(sockfd.fd);</span><br><span class="line">                    client[i].fd = <span class="number">-1</span>;</span><br><span class="line">                &#125; <span class="keyword">else</span> write(sockfd.fd, buf, n);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (--nready &lt; <span class="number">0</span>) <span class="keyword">break</span>; <span class="comment">// 没有更多的可读fd</span></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>依然使用好用的<code>nc</code>, 多开几个终端用nc去发消息，程序也能正常处理</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nc localhost 8090</span><br></pre></td></tr></table></figure>
+<h1 id="4-poll总结"><a href="#4-poll总结" class="headerlink" title="4. poll总结"></a>4. poll总结</h1><p><code>poll</code>系统调用解决了<code>select</code>的文件描述符限制，但是依然有<code>select</code>留下的性能缺点:</p>
+<ol>
+<li>fd数组(不管是fd_set还是pollfd)都要在<code>用户空间</code>和<code>内核空间</code>之间来回拷贝</li>
+<li>被监控的fd数组有事件的时候，需要遍历整个数组</li>
+</ol>
+<p>下面会谈到终极解决方案<code>epoll</code>.</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(3): I/O多路复用之select系统调用</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/" class="title">Java NIO分析(4): I/O多路复用之poll系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-06-29T03:46:02.000Z" itemprop="datePublished">2018-06-29</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" class="title">Java NIO分析(3): I/O多路复用之select系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-06-28T01:48:07.000Z" itemprop="datePublished">2018-06-28</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" class="title">Java NIO分析(2): I/O多路复用历史杂谈</a></p>
+                            <p class="item-date"><time datetime="2018-06-17T01:32:06.000Z" itemprop="datePublished">2018-06-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/14/Java-NIO分析-1-Unix网络模型/" class="title">Java NIO分析(1): Unix网络模型</a></p>
+                            <p class="item-date"><time datetime="2018-06-14T03:12:00.000Z" itemprop="datePublished">2018-06-14</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/clojure/">clojure</a></p>
+                            <p class="item-title"><a href="/2018/03/21/luminus整合shadow-cljs打包/" class="title">luminus整合shadow-cljs打包</a></p>
+                            <p class="item-date"><time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Java/">Java</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO/">NIO</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/NIO/" style="font-size: 20px;">NIO</a> <a href="/tags/clojure/" style="font-size: 15px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2018 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
