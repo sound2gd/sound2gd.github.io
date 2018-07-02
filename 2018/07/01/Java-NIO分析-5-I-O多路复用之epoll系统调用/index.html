@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Java NIO分析(5): I/O多路复用之epoll系统调用 | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="1. epoll概念poll系统调用相比于select主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:  fd数组整体在内核空间和用户空间之间拷贝  遍历整个fd数组找事件浪费资源  这俩性能问题在Banga在1999年写了篇论文A Scalable and Explicit EventDelivery Mechanism for UNIX,提出select和poll都是无状态">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(5): I&#x2F;O多路复用之epoll系统调用">
+<meta property="og:url" content="http://sound2gd.wang/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="1. epoll概念poll系统调用相比于select主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:  fd数组整体在内核空间和用户空间之间拷贝  遍历整个fd数组找事件浪费资源  这俩性能问题在Banga在1999年写了篇论文A Scalable and Explicit EventDelivery Mechanism for UNIX,提出select和poll都是无状态">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2018-07-02T13:06:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Java NIO分析(5): I&#x2F;O多路复用之epoll系统调用">
+<meta name="twitter:description" content="1. epoll概念poll系统调用相比于select主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:  fd数组整体在内核空间和用户空间之间拷贝  遍历整个fd数组找事件浪费资源  这俩性能问题在Banga在1999年写了篇论文A Scalable and Explicit EventDelivery Mechanism for UNIX,提出select和poll都是无状态">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                8
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                3
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-Java-NIO分析-5-I-O多路复用之epoll系统调用" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(5): I/O多路复用之epoll系统调用
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/">
+            <time datetime="2018-07-01T09:59:51.000Z" itemprop="datePublished">2018-07-01</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/Java/">Java</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/NIO/">NIO</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <h1 id="1-epoll概念"><a href="#1-epoll概念" class="headerlink" title="1. epoll概念"></a>1. epoll概念</h1><p><code>poll</code>系统调用相比于<code>select</code>主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:</p>
+<ol>
+<li><strong>fd数组整体在内核空间和用户空间之间拷贝</strong> </li>
+<li><strong>遍历整个fd数组找事件浪费资源</strong></li>
+</ol>
+<p>这俩性能问题在<strong>Banga</strong>在1999年写了篇论文<a href="http://static.usenix.org/event/usenix99/full_papers/banga/banga.pdf" target="_blank" rel="noopener">A Scalable and Explicit Event<br>Delivery Mechanism for UNIX</a>,提出<code>select</code>和<code>poll</code>都是无状态的，需要用户空间的进程<strong>自行遍历查找事件</strong>, 一种改进方案是<strong>内核内部自己维护事件集合</strong>.通过一个类似<code>declare_interest</code>的系统调用，内核能够<strong>增量得更新进程感兴趣的事件集合列表</strong>, 应用进程通过使用<code>get_next_event</code>调用能派发新事件给内核。</p>
+<p>根据论文的研究成果，<code>LINUX</code>和<code>FreeBSD</code>各自给出的解决方案：<code>epoll</code>和<code>kqueue</code>.我们主要讨论epoll, 毕竟日常服务端环境都是LINUX.</p>
+<p>在LINUX内核2.6以上，<code>epoll</code>才受到支持。</p>
+<a id="more"></a>
+<h1 id="2-epoll函数"><a href="#2-epoll函数" class="headerlink" title="2. epoll函数"></a>2. epoll函数</h1><p>epoll操作过程有3个函数</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">#include &lt;sys/epoll.h&gt;</span><br><span class="line"></span><br><span class="line">int epoll_create(int size);</span><br><span class="line"></span><br><span class="line">int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);</span><br><span class="line"></span><br><span class="line">int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);</span><br></pre></td></tr></table></figure>
+<ol>
+<li><code>epoll_create</code>创建一个<code>epoll fd</code>和事件表, 在LINUX2.6.8以后是使用红黑树来管理epoll事件表，所以size没有太大作用</li>
+<li><code>epoll_ctl</code>操作上面创建的epoll事件表, 可以加入socket读写事件</li>
+<li><code>epoll_wait</code>类似于以前的<code>select</code>和<code>poll</code>,得到发生的事件, 如socket可读可写</li>
+</ol>
+<p><code>epoll_ctl</code>的第二个参数使用3个宏来表示动作:</p>
+<ul>
+<li><code>EPOLL_CTL_ADD</code>: 注册新的fd到epfd中</li>
+<li><code>EPOLL_CTL_MOD</code>: 修改意见注册的fd的监听事件</li>
+<li><code>EPOLL_CTL_DEL</code>: 从epfd中删除一个fd</li>
+</ul>
+<p>第四个参数用来告诉内核需要监听什么事件, <code>epoll_event</code>结构如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> &#123;</span></span><br><span class="line">  <span class="keyword">__uint32_t</span> events; <span class="comment">// epoll事件</span></span><br><span class="line">  <span class="keyword">epoll_data_t</span> data; <span class="comment">// 用户数据变量</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>epoll事件和以前<code>poll</code>的事件类型差不多,主要还是这仨:</p>
+<ul>
+<li>EPOLLIN: 对应的fd可读</li>
+<li>EPOLLOUT: 对应的fd可写</li>
+<li>EPOLLERR: 对应的fd发送初五</li>
+</ul>
+<h1 id="3-epoll实战"><a href="#3-epoll实战" class="headerlink" title="3. epoll实战"></a>3. epoll实战</h1><p>首先，MacOS是基于BSD的，所以是没有<code>epoll</code>函数的，在Mac下开发，得去LINUX环境编译。依然是老5步</p>
+<ol>
+<li>新建socket, 用于监听端口</li>
+<li>socket的fd绑定端口</li>
+<li>socket监听</li>
+<li>创建epoll fd</li>
+<li>发起epoll_wait获取事件，使用epoll_ctl管理事件</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;netinet/in.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;arpa/inet.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;assert.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;errno.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/epoll.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MAX_FD_NUM 1024</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> MAXLEN 1024</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> buf_len = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="comment">// 1. 新建socket, 用于监听端口</span></span><br><span class="line">    <span class="keyword">int</span> listenfd = socket(AF_INET, SOCK_STREAM, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenfd == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"创建socket失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 2. 绑定端口</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">short</span> listenPort = <span class="number">8090</span>;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">server_addr</span>;</span></span><br><span class="line">    <span class="built_in">memset</span>(&amp;server_addr, <span class="number">0</span>, <span class="keyword">sizeof</span>(server_addr));</span><br><span class="line">    server_addr.sin_family = AF_INET;</span><br><span class="line">    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);</span><br><span class="line">    server_addr.sin_port = htons(listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> on = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 设置socket绑定的端口，再程序关闭之后可以重复使用</span></span><br><span class="line">    <span class="keyword">if</span> ((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &amp;on, <span class="keyword">sizeof</span>(<span class="keyword">int</span>))) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> bindRet = bind(listenfd, (struct sockaddr *) &amp;server_addr, <span class="keyword">sizeof</span>(server_addr));</span><br><span class="line">    <span class="keyword">if</span> (bindRet == <span class="number">-1</span>) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"socket绑定地址失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 3. 监听端口</span></span><br><span class="line">    <span class="keyword">int</span> listenRet = listen(listenfd, <span class="number">10</span>);</span><br><span class="line">    <span class="keyword">if</span> (listenRet == <span class="number">-1</span>) <span class="built_in">printf</span>(<span class="string">"socket监听端口失败， error: %s (errno: %d)\n"</span>, strerror(errno), errno);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"socket 监听完毕, 地址: 127.0.0.1:%d"</span>, listenPort);</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_in</span> <span class="title">client_addr</span>;</span></span><br><span class="line">    <span class="keyword">socklen_t</span> client_addr_len = <span class="keyword">sizeof</span>(struct sockaddr_in);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 4. 创建一个 epfd，并且把 listenfd 注册到这个 epfd上。</span></span><br><span class="line">    <span class="keyword">int</span> epfd = epoll_create(<span class="number">1024</span>);</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">ev</span>,<span class="title">events</span>[20];</span></span><br><span class="line">    ev.data.fd = listenfd;</span><br><span class="line">    ev.events = EPOLLIN;</span><br><span class="line">    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &amp;ev);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> cur_fd_num = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">char</span> buf[MAXLEN]=&#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="comment">// 5. 调用epoll_wait获取IO事件</span></span><br><span class="line">        <span class="comment">// nReady 就是 events 数组的长度。</span></span><br><span class="line">        <span class="keyword">int</span> nready = epoll_wait(epfd, events, <span class="number">20</span>, <span class="number">50</span>);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> i = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (; i &lt; nready; i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (events[i].data.fd == listenfd) &#123;</span><br><span class="line">                <span class="keyword">int</span> client_sockfd = accept(listenfd,(struct sockaddr*)&amp;client_addr,&amp;client_addr_len);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span>(client_sockfd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">                    perror(<span class="string">"accept"</span>);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="built_in">printf</span>(<span class="string">"accept client_addr %s\n"</span>,inet_ntoa(client_addr.sin_addr));</span><br><span class="line">                    ev.data.fd = client_sockfd;</span><br><span class="line">                    ev.events=EPOLLIN;</span><br><span class="line">                    epoll_ctl(epfd, EPOLL_CTL_ADD, client_sockfd, &amp;ev);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">else</span> <span class="keyword">if</span> (events[i].events &amp; EPOLLIN) &#123;</span><br><span class="line">                <span class="keyword">int</span> connfd = events[i].data.fd;</span><br><span class="line">                <span class="keyword">int</span> n = recv(connfd, buf, MAXLEN, <span class="number">0</span>);</span><br><span class="line">                <span class="keyword">if</span>(n &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="keyword">if</span>(ECONNRESET == errno) &#123;</span><br><span class="line">                        close(connfd);</span><br><span class="line">                        epoll_ctl(epfd, EPOLL_CTL_DEL, connfd, <span class="number">0</span>);</span><br><span class="line">                    &#125;</span><br><span class="line">                    <span class="keyword">else</span> &#123;</span><br><span class="line">                        perror(<span class="string">"recv"</span>);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">"receive %s"</span>, buf);</span><br><span class="line">                buf_len = n;</span><br><span class="line"></span><br><span class="line">                ev.data.fd = connfd;</span><br><span class="line">                ev.events = EPOLLOUT;</span><br><span class="line">                epoll_ctl(epfd, EPOLL_CTL_MOD, connfd, &amp;ev);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">else</span> <span class="keyword">if</span> (events[i].events &amp; EPOLLOUT) &#123;</span><br><span class="line">                <span class="keyword">int</span> connfd = events[i].data.fd;</span><br><span class="line">                write(connfd, buf, buf_len);</span><br><span class="line"></span><br><span class="line">                ev.data.fd = connfd;</span><br><span class="line">                ev.events = EPOLLIN;</span><br><span class="line">                epoll_ctl(epfd, EPOLL_CTL_MOD, connfd, &amp;ev);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>使用gcc编译，运行<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ gcc -o epoll ./epoll.c</span><br><span class="line">$ ./epoll</span><br></pre></td></tr></table></figure></p>
+<p>然后使用<code>nc</code>测试就好了</p>
+<h1 id="4-epoll总结"><a href="#4-epoll总结" class="headerlink" title="4. epoll总结"></a>4. epoll总结</h1><p><code>epoll</code>解决了<code>select</code>和<code>poll</code>时代遗留的2个性能问题，不需要使fd数组整体在内核空间和用户空间之间来回拷贝，同时<br>不需要应用进程遍历整个fd数组以查找发生的事件。<code>epoll</code>使用<code>mmap</code>加速了内核和用户空间的消息传递，避免不必要的内存拷贝。<br><code>epoll</code>只会返回活跃的socket fd,所以I/O效率不会随着fd数目增加而显著下降。</p>
+<p><code>epoll</code>还支持<code>ET(边缘触发)</code>和<code>LT(水平触发)</code>，这些就不细讲了。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(4): I/O多路复用之poll系统调用</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/" class="title">Java NIO分析(5): I/O多路复用之epoll系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-07-01T09:59:51.000Z" itemprop="datePublished">2018-07-01</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/" class="title">Java NIO分析(4): I/O多路复用之poll系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-06-29T03:46:02.000Z" itemprop="datePublished">2018-06-29</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" class="title">Java NIO分析(3): I/O多路复用之select系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-06-28T01:48:07.000Z" itemprop="datePublished">2018-06-28</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" class="title">Java NIO分析(2): I/O多路复用历史杂谈</a></p>
+                            <p class="item-date"><time datetime="2018-06-17T01:32:06.000Z" itemprop="datePublished">2018-06-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/06/14/Java-NIO分析-1-Unix网络模型/" class="title">Java NIO分析(1): Unix网络模型</a></p>
+                            <p class="item-date"><time datetime="2018-06-14T03:12:00.000Z" itemprop="datePublished">2018-06-14</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Java/">Java</a><span class="category-list-count">5</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO/">NIO</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/NIO/" style="font-size: 20px;">NIO</a> <a href="/tags/clojure/" style="font-size: 15px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2018 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
