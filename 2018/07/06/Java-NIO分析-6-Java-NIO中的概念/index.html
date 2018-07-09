@@ -16,7 +16,7 @@
 <meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
 <meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/06/20180706074513.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
 <meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/09/20180709160855.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2018-07-09T08:10:57.000Z">
+<meta property="og:updated_time" content="2018-07-09T08:20:50.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Java NIO分析(6): 从BIO到NIO-设计和概念">
 <meta name="twitter:description" content="前面介绍了Unix的I/O模型以及多路复用的c实现，为什么要介绍这些呢？ 因为JVM是用c++写的，JDK的native方法也都是用c写的，最后它们调用的还是操作系统底层的api,所以了解一些关键的底层原理还是有必要的。">
@@ -301,7 +301,11 @@
 <li>直接内存， Java的socket往外读写数据都要先复制堆内的数据到堆外，然后再调用send(因为堆内的对象地址会变，socket的send用c写的,地址不能变)</li>
 </ul>
 <hr>
-<p><a href="https://www.ibm.com/developerworks/library/j-zerocopy/" target="_blank" rel="noopener">java中的zero-copy高性能文件数据传输</a><br><a href="http://gee.cs.oswego.edu/dl/cpjslides/nio.pdf" target="_blank" rel="noopener">Scalable IO in Java</a></p>
+<p>参考资料</p>
+<ol>
+<li><a href="https://www.ibm.com/developerworks/library/j-zerocopy/" target="_blank" rel="noopener">java中的zero-copy高性能文件数据传输</a></li>
+<li><a href="http://gee.cs.oswego.edu/dl/cpjslides/nio.pdf" target="_blank" rel="noopener">Scalable IO in Java</a></li>
+</ol>
 
         
         </div>
