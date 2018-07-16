@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Java NIO分析(9): 从BSD socket到SocketChannel | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="前面我们讲了高并发核心Selector的源码分析，看到其对操作系统I/O多路复用的简单封装。有了I/O多路复用之后，我们还需要非阻塞的socket读写操作. 因为内核告诉你A连接有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的socket API, 那么进程或者线程会在这里阻塞，浪费了CPU的时钟周期和珍贵的线程资源。使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(9): 从BSD socket到SocketChannel">
+<meta property="og:url" content="http://sound2gd.wang/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="前面我们讲了高并发核心Selector的源码分析，看到其对操作系统I/O多路复用的简单封装。有了I/O多路复用之后，我们还需要非阻塞的socket读写操作. 因为内核告诉你A连接有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的socket API, 那么进程或者线程会在这里阻塞，浪费了CPU的时钟周期和珍贵的线程资源。使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716081628.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716083309.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716224333.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-07-16T15:54:45.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Java NIO分析(9): 从BSD socket到SocketChannel">
+<meta name="twitter:description" content="前面我们讲了高并发核心Selector的源码分析，看到其对操作系统I/O多路复用的简单封装。有了I/O多路复用之后，我们还需要非阻塞的socket读写操作. 因为内核告诉你A连接有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的socket API, 那么进程或者线程会在这里阻塞，浪费了CPU的时钟周期和珍贵的线程资源。使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继">
+<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716081628.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                12
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                3
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-Java-NIO分析-9-从BSD-socket到SocketChannel" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(9): 从BSD socket到SocketChannel
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/">
+            <time datetime="2018-07-15T23:56:32.000Z" itemprop="datePublished">2018-07-16</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/Java/">Java</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/NIO/">NIO</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>前面我们讲了高并发核心<code>Selector</code>的源码分析，看到其对操作系统I/O多路复用的简单封装。<br>有了I/O多路复用之后，我们还需要<strong>非阻塞的socket读写操作</strong>.</p>
+<p>因为内核告诉你<strong>A连接</strong>有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的<br>socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费了CPU的时钟周期和珍贵的线程资源。<br>使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继续读下一个<strong>B连接</strong>的数据。</p>
+<p><code>SocketChannel</code>就是NIO对于非阻塞socket操作的支持的组件，其在socket上封装了一层, 所以我们先从<code>Socket API</code>说起。</p>
+<a id="more"></a>
+<h1 id="1-大名鼎鼎的Socket"><a href="#1-大名鼎鼎的Socket" class="headerlink" title="1. 大名鼎鼎的Socket"></a>1. 大名鼎鼎的Socket</h1><p>在<a href="/2018/06/17/Java-NIO分析-2-I-O多路复用历史杂谈/" title="Java NIO分析(2): I/O多路复用历史杂谈">Java NIO分析(2): I/O多路复用历史杂谈</a>中我们讲过，1982年, BSD那帮人发布了<a href="http://digitalassets.lib.berkeley.edu/techreports/ucb/text/CSD-83-146.pdf" target="_blank" rel="noopener">Socket和TCP/IP协议栈</a>和select系统调用.</p>
+<p>当时Unix系统严重缺乏进程间通信的手段, 全靠一手出神入化的fork大法在维持<br>所以Socket发布的时候，是用来做<code>进程间通信(IPC)的</code>.</p>
+<p>放在36年后的今天，这个定义也不过时<br><strong>网络通信其实就是不同机器的不同操作系统上socket之间的通信</strong>.</p>
+<h2 id="1-1-Socket-API怎么玩？"><a href="#1-1-Socket-API怎么玩？" class="headerlink" title="1.1 Socket API怎么玩？"></a>1.1 Socket API怎么玩？</h2><p>先放张图，从<a href="https://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/howdosockets.htm" target="_blank" rel="noopener">IBM那里的文章</a>抄过来的</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716081628.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>这就是典型的socket通信的流程。</p>
+<ol>
+<li>通过socket()函数创建一个socket fd, 代表通信端点</li>
+<li>绑定端口，协议栈，Socket类型(TCP就是流式Socket)</li>
+<li>监听, 完了就可以接口客户端的TCP链接了，这个时候建立的TCP链接和accept的不一样，会存在内核的某个队列里，长度由你们都熟悉的<code>SO_BACKLOG</code>指定</li>
+<li>接收链接</li>
+<li>通信, 愉快的交换数据</li>
+<li>关闭链接</li>
+</ol>
+<p>socket通信需要知道5元组(本地IP+端口，服务器IP+端口，协议)</p>
+<p>话说TCP协议实现上这里有个历史缺陷，也是<code>SYN Flood</code>的攻击原理，在TCP3次握手的时候，假如只握手一次，之后就不管了。那么<code>SYN队列</code>会被撑满，之后就不能建立TCP链接了(一般会被拒绝，看操作系统实现).比较可怕的是这都是发生在内核的，还没到应用层, 开发人员一脸懵逼</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716083309.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<h2 id="1-2-TCP-IP发过来的包去哪了？"><a href="#1-2-TCP-IP发过来的包去哪了？" class="headerlink" title="1.2 TCP/IP发过来的包去哪了？"></a>1.2 TCP/IP发过来的包去哪了？</h2><p>TCP/IP将网络分成四层，分别是:</p>
+<ul>
+<li>应用层</li>
+<li>传输层(TCP)</li>
+<li>网络层(IP)</li>
+<li>物理层</li>
+</ul>
+<p>粗略得讲，IP协议保证网络包通过路由器能投递给目标机器网卡，经过网卡驱动会触发一个中断给<br>内核，内核会根据协议解包数据,然后复制数据到socket的读写缓冲区.</p>
+<p>如果socket fd被加入到了多路复用的监听队列里，如<code>epoll_ctl</code>加入的fd,那么在下次<code>epoll_wait</code>的时候，将会返回该socket有数据可读可写, 过程即完整的一次网络I/O事件通知。</p>
+<p>这个时候应用进程直接调用socket的read方法，内核就会将数据从socket的读缓冲区复制到应用进程的缓冲区了。</p>
+<p>上图(看图一分钟，画图半小时):</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/16/20180716224333.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<h1 id="2-SocketChannel详解"><a href="#2-SocketChannel详解" class="headerlink" title="2. SocketChannel详解"></a>2. SocketChannel详解</h1><p><code>SocketChannel</code>是对传统Java Socket API的改进，主要是支持了<strong>非阻塞的读写</strong>。同时改进了传统的单向流API, Channel同时支持读写(其实就是加了个中间层<code>Buffer</code>)。</p>
+<h2 id="2-1-创建一个SocketChannel时做了什么"><a href="#2-1-创建一个SocketChannel时做了什么" class="headerlink" title="2.1 创建一个SocketChannel时做了什么"></a>2.1 创建一个SocketChannel时做了什么</h2><p>通过<code>SocketChannel.open()</code>可以打开一个<code>SocketChannel</code>, 最后还是委托给<code>SelectorProvider</code>的<code>openSocketChannel</code>方法</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// sun.nio.ch.SelectorProvider</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> SocketChannel <span class="title">openSocketChannel</span><span class="params">()</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="comment">// 调用SocketChannelImpl的构造器</span></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> SocketChannelImpl(<span class="keyword">this</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// sun.nio.ch.SocketChannelImpl</span></span><br><span class="line">SocketChannelImpl(SelectorProvider sp) <span class="keyword">throws</span> IOException &#123;</span><br><span class="line">    <span class="keyword">super</span>(sp);</span><br><span class="line">    <span class="comment">// 创建socket fd</span></span><br><span class="line">    <span class="keyword">this</span>.fd = Net.socket(<span class="keyword">true</span>);</span><br><span class="line">    <span class="comment">// 获取socket fd的值</span></span><br><span class="line">    <span class="keyword">this</span>.fdVal = IOUtil.fdVal(fd);</span><br><span class="line">    <span class="comment">// 初始化SocketChannel状态, 状态不多，总共就6个</span></span><br><span class="line">    <span class="comment">// 未初始化，未连接，正在连接，已连接，断开连接中，已断开</span></span><br><span class="line">    <span class="keyword">this</span>.state = ST_UNCONNECTED;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// sun.nio.ch.Net</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> FileDescriptor <span class="title">socket</span><span class="params">(ProtocolFamily family, <span class="keyword">boolean</span> stream)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">boolean</span> preferIPv6 = isIPv6Available() &amp;&amp;</span><br><span class="line">        (family != StandardProtocolFamily.INET);</span><br><span class="line">    <span class="comment">// 最后调用的是socket0</span></span><br><span class="line">    <span class="keyword">return</span> IOUtil.newFD(socket0(preferIPv6, stream, <span class="keyword">false</span>));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Due to oddities SO_REUSEADDR on windows reuse is ignored</span></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">native</span> <span class="keyword">int</span> <span class="title">socket0</span><span class="params">(<span class="keyword">boolean</span> preferIPv6, <span class="keyword">boolean</span> stream, <span class="keyword">boolean</span> reuse)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>可以看到，最后还是靠一个native方法<code>socket0</code>来创建socket fd,打开<code>jdk/src/solaris/native/sun/nio/ch/Net.c</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">JNIEXPORT <span class="keyword">int</span> JNICALL</span><br><span class="line">Java_sun_nio_ch_Net_socket0(JNIEnv *env, jclass cl, jboolean preferIPv6,</span><br><span class="line">                            jboolean stream, jboolean reuse)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">int</span> fd;</span><br><span class="line">    <span class="keyword">int</span> type = (stream ? SOCK_STREAM : SOCK_DGRAM);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 老朋友socket函数</span></span><br><span class="line">    fd = socket(domain, type, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (fd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> handleSocketError(env, errno);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ....省略非关键代码</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 设置是否重用地址，如果打开的是ServerSocketChannel</span></span><br><span class="line">    <span class="comment">// 默认是重用的，其他普通SocketChannel默认不重用</span></span><br><span class="line">    <span class="comment">// 重用和不重用的区别在于，就算你关掉了程序，你绑定的</span></span><br><span class="line">    <span class="comment">// 本地端口也在一定时间内是已使用的(address already in use)</span></span><br><span class="line">    <span class="keyword">if</span> (reuse) &#123;</span><br><span class="line">        <span class="keyword">int</span> arg = <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">if</span> (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (<span class="keyword">char</span>*)&amp;arg,</span><br><span class="line">                       <span class="keyword">sizeof</span>(arg)) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            JNU_ThrowByNameWithLastError(env,</span><br><span class="line">                                         JNU_JAVANETPKG <span class="string">"SocketException"</span>,</span><br><span class="line">                                         <span class="string">"Unable to set SO_REUSEADDR"</span>);</span><br><span class="line">            close(fd);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> fd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>果然，底层还是<code>socket</code>函数，这样一个socket fd就创建好了。</p>
+<p>PS: 其实创建个socket fd操作系统内核做了很多事情的，要判断一大堆东西，还要创建和初始化读写缓冲区，加自旋锁等.</p>
+<h2 id="2-2-如何实现非阻塞"><a href="#2-2-如何实现非阻塞" class="headerlink" title="2.2 如何实现非阻塞"></a>2.2 如何实现非阻塞</h2><p>正常在c里我们实现非阻塞是靠<code>fcntl</code>这个函数，这个函数全称就是<code>file control</code>,<br>通过它可以管理fd的各种属性，比如设置fd的阻塞与否。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">fcntl</span><span class="params">(<span class="keyword">int</span> fildes, <span class="keyword">int</span> cmd, ...)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>第一个参数是传入的fd, 第二个参数是操作类型，后面是flag<br>要非阻塞，操作类型是<code>F_SETFL</code>和<code>F_GETFL</code>,flag是<code>O_NONBLOCK</code></p>
+<p>那么JVM是怎么做的呢，在SocketChannel上有一个<code>configureBlocking</code>函数，这个函数是设置当前<code>SocketChannel</code>是否是阻塞的，和selector一起用的时候一定要设置成非阻塞才有意义, 阻塞的话就不需要IO多路复用的事件通知了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// java.nio.channels.spi.AbstractSelectableChannel</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> SelectableChannel <span class="title">configureBlocking</span><span class="params">(<span class="keyword">boolean</span> block)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> IOException</span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">// 模板方法模式，调用子类的实现</span></span><br><span class="line">    implConfigureBlocking(block);</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在<code>SocketChannelImpl</code>里看</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">implConfigureBlocking</span><span class="params">(<span class="keyword">boolean</span> block)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    IOUtil.configureBlocking(fd, block);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>将这个操作又交给了<code>IOUtil</code>的<code>configureBlocking</code>, 同时还传入了我们上面创建的socket fd. 打开<code>IOUtil</code>一看</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">native</span> <span class="keyword">void</span> <span class="title">configureBlocking</span><span class="params">(FileDescriptor fd,</span></span></span><br><span class="line"><span class="function"><span class="params">                                            <span class="keyword">boolean</span> blocking)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> IOException</span>;</span><br></pre></td></tr></table></figure>
+<p>还是要找c的实现，打开<code>IOUtil.c</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">JNIEXPORT <span class="keyword">void</span> JNICALL</span><br><span class="line">Java_sun_nio_ch_IOUtil_configureBlocking(JNIEnv *env, jclass clazz,</span><br><span class="line">                                         jobject fdo, jboolean blocking)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (configureBlocking(fdval(env, fdo), blocking) &lt; <span class="number">0</span>)</span><br><span class="line">        JNU_ThrowIOExceptionWithLastError(env, <span class="string">"Configure blocking failed"</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">int</span></span><br><span class="line">configureBlocking(<span class="keyword">int</span> fd, jboolean blocking)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 所以还是靠file control</span></span><br><span class="line">    <span class="keyword">int</span> flags = fcntl(fd, F_GETFL);</span><br><span class="line">    <span class="keyword">int</span> newflags = blocking ? (flags &amp; ~O_NONBLOCK) : (flags | O_NONBLOCK);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> (flags == newflags) ? <span class="number">0</span> : fcntl(fd, F_SETFL, newflags);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到，JVM也是靠<code>fcntl</code>来实现非阻塞的，所以服务端编程知道一些底层的API还是有价值的和有必要的。</p>
+<h2 id="2-3-SocketChannel的读写"><a href="#2-3-SocketChannel的读写" class="headerlink" title="2.3 SocketChannel的读写"></a>2.3 SocketChannel的读写</h2><p>那么SocketChannel是如何读写呢，打开<code>SocketChannelImpl</code></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">read</span><span class="params">(ByteBuffer buf)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="comment">// n表示读到的数据长度</span></span><br><span class="line">  <span class="keyword">int</span> n = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">      <span class="comment">// 从socket fd里读数据，长度由buf决定</span></span><br><span class="line">      n = IOUtil.read(fd, buf, -<span class="number">1</span>, nd);</span><br><span class="line">      <span class="keyword">if</span> ((n == IOStatus.INTERRUPTED) &amp;&amp; isOpen()) &#123;</span><br><span class="line">          <span class="comment">// The system call was interrupted but the channel</span></span><br><span class="line">          <span class="comment">// is still open, so retry</span></span><br><span class="line">          <span class="keyword">continue</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> IOStatus.normalize(n);</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>读交给了<code>IOUtil</code>的<code>read</code>方法</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">read</span><span class="params">(FileDescriptor fd, ByteBuffer dst, <span class="keyword">long</span> position,</span></span></span><br><span class="line"><span class="function"><span class="params">                NativeDispatcher nd)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> IOException</span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (dst.isReadOnly())</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"Read-only buffer"</span>);</span><br><span class="line">    <span class="comment">// 判断是不是DirectBuffer，是直接读进去</span></span><br><span class="line">    <span class="comment">// DirectBuffer是有名的冰山对象，其后可能关联着一堆直接内存</span></span><br><span class="line">    <span class="keyword">if</span> (dst <span class="keyword">instanceof</span> DirectBuffer)</span><br><span class="line">        <span class="keyword">return</span> readIntoNativeBuffer(fd, dst, position, nd);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果传入的不是DirectBuffer,那么使用临时的DirectBuffer</span></span><br><span class="line">    <span class="comment">// Substitute a native buffer</span></span><br><span class="line">    ByteBuffer bb = Util.getTemporaryDirectBuffer(dst.remaining());</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">int</span> n = readIntoNativeBuffer(fd, bb, position, nd);</span><br><span class="line">        bb.flip();</span><br><span class="line">        <span class="keyword">if</span> (n &gt; <span class="number">0</span>)</span><br><span class="line">            dst.put(bb);</span><br><span class="line">        <span class="keyword">return</span> n;</span><br><span class="line">    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">        Util.offerFirstTemporaryDirectBuffer(bb);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">readIntoNativeBuffer</span><span class="params">(FileDescriptor fd, ByteBuffer bb,</span></span></span><br><span class="line"><span class="function"><span class="params">                                        <span class="keyword">long</span> position, NativeDispatcher nd)</span></span></span><br><span class="line"><span class="function">    <span class="keyword">throws</span> IOException</span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">int</span> pos = bb.position();</span><br><span class="line">    <span class="keyword">int</span> lim = bb.limit();</span><br><span class="line">    <span class="keyword">assert</span> (pos &lt;= lim);</span><br><span class="line">    <span class="keyword">int</span> rem = (pos &lt;= lim ? lim - pos : <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (rem == <span class="number">0</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">int</span> n = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 调用本地方法去读</span></span><br><span class="line">    <span class="comment">// 要读socket fd一定要知道起始地址</span></span><br><span class="line">    <span class="comment">// 感兴趣可以看看https://stackoverflow.com/questions/11981474/pread-and-lseek-not-working-on-socket-file-descriptor</span></span><br><span class="line">    <span class="comment">// 调用完毕bb的那个DirectBuffer的直接内存里就有数据了</span></span><br><span class="line">    <span class="keyword">if</span> (position != -<span class="number">1</span>) &#123;</span><br><span class="line">        n = nd.pread(fd, ((DirectBuffer)bb).address() + pos,</span><br><span class="line">                     rem, position);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        n = nd.read(fd, ((DirectBuffer)bb).address() + pos, rem);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (n &gt; <span class="number">0</span>)</span><br><span class="line">        bb.position(pos + n);</span><br><span class="line">    <span class="keyword">return</span> n;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">native</span> <span class="keyword">int</span> <span class="title">pread0</span><span class="params">(FileDescriptor fd, <span class="keyword">long</span> address, <span class="keyword">int</span> len,</span></span></span><br><span class="line"><span class="function"><span class="params">                         <span class="keyword">long</span> position)</span> <span class="keyword">throws</span> IOException</span>;</span><br></pre></td></tr></table></figure>
+<p>这里解释下为啥一定要用<code>DirectBuffer</code>, 在JVM里是有GC的，在调用Socket Api进行读写通信的时候，传入的是一个固定的内存地址，假如数据使用的是堆内地址，GC之后对象地址就变了，这时socket读写就会崩。</p>
+<p>上面还有最后一个<code>pread0</code>方法，这个是文件IO函数，传入socket fd的时候，<strong>将会从socket的读缓冲区复制数据</strong>，这里不细讲,感兴趣可以看看<a href="https://blog.csdn.net/zongcai249/article/details/17598411" target="_blank" rel="noopener">这篇文章</a></p>
+<p><code>SocketChannel</code>如何实现<strong>写操作</strong>就交给读者自行完成了，和读差不多。</p>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本节介绍了祖传的<code>Socket API</code>是怎么一回事，以及数据是怎么从网络到达应用进程的(因为老有人问).</p>
+<p>同时分析了openjdk对<code>SocketChannel</code>的实现细节，其实都是对底层<code>socket</code>的API封装, 所以熟知一些关键API还是有必要的。</p>
+<!-- 彩蛋: 毕竟信息的传递有它的流失成本在，不了解底层看上层总感觉是雾里看花:) -->
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/07/12/Java-NIO分析-8-Selector详解/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(8): 高并发核心Selector详解</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/" class="title">Java NIO分析(9): 从BSD socket到SocketChannel</a></p>
+                            <p class="item-date"><time datetime="2018-07-15T23:56:32.000Z" itemprop="datePublished">2018-07-16</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/12/Java-NIO分析-8-Selector详解/" class="title">Java NIO分析(8): 高并发核心Selector详解</a></p>
+                            <p class="item-date"><time datetime="2018-07-12T15:11:27.000Z" itemprop="datePublished">2018-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/10/Java-NIO分析-7-NIO核心分析之Channel-Buffer和Selector/" class="title">Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</a></p>
+                            <p class="item-date"><time datetime="2018-07-10T13:34:17.000Z" itemprop="datePublished">2018-07-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/06/Java-NIO分析-6-Java-NIO中的概念/" class="title">Java NIO分析(6): 从BIO到NIO-设计和概念</a></p>
+                            <p class="item-date"><time datetime="2018-07-05T23:04:55.000Z" itemprop="datePublished">2018-07-06</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/" class="title">Java NIO分析(5): I/O多路复用之epoll系统调用</a></p>
+                            <p class="item-date"><time datetime="2018-07-01T09:59:51.000Z" itemprop="datePublished">2018-07-01</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Java/">Java</a><span class="category-list-count">9</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO/">NIO</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/NIO/" style="font-size: 20px;">NIO</a> <a href="/tags/clojure/" style="font-size: 15px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2018 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
