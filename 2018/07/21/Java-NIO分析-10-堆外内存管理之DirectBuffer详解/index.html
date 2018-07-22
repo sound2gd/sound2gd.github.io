@@ -3,22 +3,22 @@
 <head>
     <meta charset="utf-8">
     
-    <title>Java NIO分析(10): 堆外内存复用之DirectBuffer详解 | Sound2gd的博客</title>
+    <title>Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊为什">
+    <meta name="description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊JV">
 <meta name="keywords" content="NIO">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Java NIO分析(10): 堆外内存复用之DirectBuffer详解">
+<meta property="og:title" content="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">
 <meta property="og:url" content="http://sound2gd.wang/2018/07/21/Java-NIO分析-10-堆外内存管理之DirectBuffer详解/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊为什">
+<meta property="og:description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊JV">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/22/20180722092445.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
 <meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/22/20180722095054.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2018-07-22T03:12:12.000Z">
+<meta property="og:updated_time" content="2018-07-22T07:31:14.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Java NIO分析(10): 堆外内存复用之DirectBuffer详解">
-<meta name="twitter:description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊为什">
+<meta name="twitter:title" content="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">
+<meta name="twitter:description" content="前面我们详细讲了Java NIO分析(8): 高并发核心Selector详解和Java NIO分析(9): 从BSD socket到SocketChannel, 分别是NIO的事件分发器和非阻塞处理器. 为了支持Channel的双向读写和Scatter/Gather操作，我们还需要Buffer,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解. 接下来我们聊聊JV">
 <meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/22/20180722092445.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
@@ -207,7 +207,7 @@ var _hmt = _hmt || [];
                 
     
         <h1 class="article-title" itemprop="name">
-            Java NIO分析(10): 堆外内存复用之DirectBuffer详解
+            Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解
         </h1>
     
 
@@ -244,7 +244,7 @@ var _hmt = _hmt || [];
             
             <p>前面我们详细讲了<a href="/2018/07/12/Java-NIO分析-8-Selector详解/" title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>和<a href="/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/" title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>, 分别是NIO的事件分发器和非阻塞处理器.</p>
 <p>为了支持<code>Channel</code>的双向读写和<code>Scatter/Gather</code>操作，我们还需要<code>Buffer</code>,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解.</p>
-<p>接下来我们聊聊为什么要设计出<code>DirectBuffer</code>。<br><a id="more"></a></p>
+<p>接下来我们聊聊JVM使用堆外内存的沧桑历史以及为什么要设计出<code>DirectBuffer</code>。<br><a id="more"></a></p>
 <p>首先我们要从没有NIO的前JDK1.4时代开始说起，那会儿大家使用的是<code>SocketInputStream</code>和<code>SocketOutputStream</code>.</p>
 <h1 id="1-Java传统的Socket是如何收发数据的"><a href="#1-Java传统的Socket是如何收发数据的" class="headerlink" title="1. Java传统的Socket是如何收发数据的?"></a>1. Java传统的Socket是如何收发数据的?</h1><p>以<code>SocketOutputStream</code>为例，继承类图如下：</p>
 <p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/22/20180722092445.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
@@ -287,7 +287,12 @@ var _hmt = _hmt || [];
 <p>在回收的时候调用其run方法，可以看到就是调用<code>sun.misc.unsafe</code>去释放的。这里提下,unsafe类里都是静态native方法，其实就是堆大家常用的各种<code>free</code>,<code>malloc</code>这样的内存操作函数的封装，因为java不能操作直接内存。</p>
 <h2 id="One-more-thing"><a href="#One-more-thing" class="headerlink" title="One more thing"></a>One more thing</h2><p>构造<code>DirectBuffer</code>的时候，有一行<code>Bits.reserveMemory</code>, 功能主要是记录jdk已经使用的直接内存的数量, but会判断有没有足够多的直接内存使用，如果内存不够，会触发gc..</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// These methods should be called whenever direct memory is allocated or</span></span><br><span class="line"><span class="comment">// freed.  They allow the user to control the amount of direct memory</span></span><br><span class="line"><span class="comment">// which a process may access.  All sizes are specified in bytes.</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">reserveMemory</span><span class="params">(<span class="keyword">long</span> size, <span class="keyword">int</span> cap)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">synchronized</span> (Bits.class) &#123;</span><br><span class="line">        <span class="comment">// 判断内存够不够， 够的话直接增加内存引用的计数</span></span><br><span class="line">        <span class="keyword">if</span> (!memoryLimitSet &amp;&amp; VM.isBooted()) &#123;</span><br><span class="line">            maxMemory = VM.maxDirectMemory();</span><br><span class="line">            memoryLimitSet = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// -XX:MaxDirectMemorySize limits the total capacity rather than the</span></span><br><span class="line">        <span class="comment">// actual memory usage, which will differ when buffers are page</span></span><br><span class="line">        <span class="comment">// aligned.</span></span><br><span class="line">        <span class="keyword">if</span> (cap &lt;= maxMemory - totalCapacity) &#123;</span><br><span class="line">            reservedMemory += size;</span><br><span class="line">            totalCapacity += cap;</span><br><span class="line">            count++;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 内存不够就去建议JVM gc了。。</span></span><br><span class="line">    System.gc();</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="comment">// 等待垃圾回收</span></span><br><span class="line">        Thread.sleep(<span class="number">100</span>);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (InterruptedException x) &#123;</span><br><span class="line">        <span class="comment">// Restore interrupt status</span></span><br><span class="line">        Thread.currentThread().interrupt();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">synchronized</span> (Bits.class) &#123;</span><br><span class="line">        <span class="comment">// 增加直接内存的计数</span></span><br><span class="line">        <span class="keyword">if</span> (totalCapacity + cap &gt; maxMemory)</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> OutOfMemoryError(<span class="string">"Direct buffer memory"</span>);</span><br><span class="line">        reservedMemory += size;</span><br><span class="line">        totalCapacity += cap;</span><br><span class="line">        count++;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本文从<code>SocketStream</code>开始讲起，分析了祖传BIO里Socket的内存缺陷和性能瓶颈，然后介绍了NIO的对堆外内存改进–即复用堆外内存, 并从源码层面解读了其如何创建和回收。</p>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本文从<code>SocketStream</code>开始讲起，分析了祖传BIO里Socket的内存缺陷和性能瓶颈:</p>
+<ol>
+<li><strong>每次发送都需要<code>malloc</code>一块新直接内存，</strong></li>
+<li><strong>要将数据从堆内copy到堆外,然后再send</strong>. </li>
+</ol>
+<p>然后介绍了NIO的对堆外内存改进–即<strong>复用堆外内存</strong>, 以及复用堆外内存引出的堆外内存回收问题， 并从源码层面解读了其如何创建和回收。NIO的改进只是针对1，但是对2没改进，没准儿这是java吃内存的原因之一。</p>
 <p><code>DirectBuffer</code>是我们常用的<code>冰山对象</code>，使用的时候要慎重，如果该对象在年轻代, 容易gc, 回收的时候直接内存可以被释放掉。但是在存活了几次gc之后，被移入年老代，就不容易gc了。 其所关联的直接内存也不会被释放。</p>
 <p>这也是常见的一个内存泄漏原因，看JVM堆内没用多少内存，但是机器上内存所剩无几，还频繁gc, 频繁触发<code>OOM Killer</code>, 希望看完本文大家能意识到问题出在哪 :)</p>
 <!-- --- -->
@@ -396,7 +401,7 @@ var _hmt = _hmt || [];
                         
                         <div class="item-inner">
                             <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
-                            <p class="item-title"><a href="/2018/07/21/Java-NIO分析-10-堆外内存管理之DirectBuffer详解/" class="title">Java NIO分析(10): 堆外内存复用之DirectBuffer详解</a></p>
+                            <p class="item-title"><a href="/2018/07/21/Java-NIO分析-10-堆外内存管理之DirectBuffer详解/" class="title">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></p>
                             <p class="item-date"><time datetime="2018-07-21T15:45:47.000Z" itemprop="datePublished">2018-07-21</time></p>
                         </div>
                     </li>
