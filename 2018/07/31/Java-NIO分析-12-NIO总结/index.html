@@ -3,18 +3,22 @@
 <head>
     <meta charset="utf-8">
     
-    <title>分类: Java | Sound2gd的博客</title>
+    <title>Java NIO分析(12): NIO总结 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="sound2gd的博客">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Sound2gd的博客">
-<meta property="og:url" content="http://sound2gd.wang/categories/Java/index.html">
+    <meta name="description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
+<meta name="keywords" content="NIO">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java NIO分析(12): NIO总结">
+<meta property="og:url" content="http://sound2gd.wang/2018/07/31/Java-NIO分析-12-NIO总结/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="sound2gd的博客">
+<meta property="og:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
 <meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-08-06T05:17:56.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sound2gd的博客">
-<meta name="twitter:description" content="sound2gd的博客">
+<meta name="twitter:title" content="Java NIO分析(12): NIO总结">
+<meta name="twitter:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
+<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -194,25 +198,21 @@ var _hmt = _hmt || [];
 </aside>
 
             
-            <section id="main">
-<div class="timeline timeline-wrap">
-    <div class="timeline-row timeline-row-major">
-        <span class="node"><i class="fa fa-folder"></i></span>
-        <h1 class="title">Java</h1>
-    </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+            <section id="main"><article id="post-Java-NIO分析-12-NIO总结" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
                 
     
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/31/Java-NIO分析-12-NIO总结/">Java NIO分析(12): NIO总结</a>
+        <h1 class="article-title" itemprop="name">
+            Java NIO分析(12): NIO总结
         </h1>
     
 
-                <div class="article-meta">
-                    
+                
+                    <div class="article-meta">
+                        
     <div class="article-date">
         <i class="fa fa-calendar"></i>
         <a href="/2018/07/31/Java-NIO分析-12-NIO总结/">
@@ -221,351 +221,160 @@ var _hmt = _hmt || [];
     </div>
 
 
-                    
+                        
     <div class="article-category">
     	<i class="fa fa-folder"></i>
         <a class="article-category-link" href="/categories/Java/">Java</a>
     </div>
 
-                    
+                        
     <div class="article-tag">
         <i class="fa fa-tag"></i>
         <a class="tag-link" href="/tags/NIO/">NIO</a>
     </div>
 
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+                    </div>
                 
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/24/Java-NIO分析-11-零拷贝技术/">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
-        </h1>
-    
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧<br>写这个系列的起因是各个框架比如<code>netty</code>, <code>tomcat</code>, <code>jetty</code>这些高性能框架的<br>基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p>
+<a id="more"></a>
+<h1 id="1-NIO网络编程体系"><a href="#1-NIO网络编程体系" class="headerlink" title="1. NIO网络编程体系"></a>1. NIO网络编程体系</h1><p>本系列主要是讲NIO网络编程相关的，因为Java服务端开发最关心的就是这些。<br><strong>我们记不住孤立的事实， 知识得体系化</strong>. 这里上一张笔者写本系列画的脑图</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>笔者先从Unix网络编程开始, 讲了5种IO模型，</p>
+<ul>
+<li>阻塞I/O(blocking I/O)</li>
+<li>非阻塞I/O(non-blocking I/O)</li>
+<li>I/O复用(I/O multiplexing)</li>
+<li>信号驱动式I/O(signal-driven I/O)</li>
+<li>异步I/O(asynchronous I/O)</li>
+</ul>
+<p>并指出所有的I/O模型都要经历2个阶段，即<code>数据准备</code>和<code>内核拷贝数据到应用进程</code><br>异步I/O模型虽然效率高，但是编程复杂，在实际用的不算多。前四种模型的区别主要在第一阶段数据准备<br>第二阶段拷贝数据都会阻塞。</p>
+<p>I/O多路复用是使用最广泛的I/O模型，内核帮助你完成了<code>Event Loop</code>, 你<code>select</code>之后得到的就是<br>已经准备就绪的fd集合.</p>
+<p>接下来研究了下I/O多路复用的历史，知道了没有Socket和select之前的黑历史，全靠进程的fork来完成<br>进程之间的通信，一个负责读一个负责写，还经常有同步问题, 更早的还有非分时操作系统，那个感兴趣的<br>可以自己去维基百科瞅瞅。</p>
+<p>在<a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" title="Java NIO分析(3): I/O多路复用之select系统调用">Java NIO分析(3): I/O多路复用之select系统调用</a> ,<a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/" title="Java NIO分析(4): I/O多路复用之poll系统调用">Java NIO分析(4): I/O多路复用之poll系统调用</a> , <a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/" title="Java NIO分析(5): I/O多路复用之epoll系统调用">Java NIO分析(5): I/O多路复用之epoll系统调用</a>里举了几个实际的使用I/O多路复用的api例子，看了下我们是如何在操作系统提供的api上具体使用多路复用的。</p>
+<p>以上基础完成之后，我们介绍了NIO的一些基本概念，如<strong>同步异步，阻塞非阻塞</strong>， 并指出<code>阻塞</code>和<code>非阻塞</code>关注的是<strong>应用进程在等待调用结果时的状态</strong>, 而<code>同步</code>和<code>异步</code>关注的是<strong>通信</strong>.再从BIO的设计和缺陷开始讲起，引出为什么要搞NIO.</p>
+<blockquote>
+<ol>
+<li>客户端连接很多的时候，会创建大量的处理线程，每创建一个线程都需要分配一定的栈空间,一般是1K~1M,那么4G内存也只能起4000~40000个线程。</li>
+<li>线程多导致上下文切换严重</li>
+<li>阻塞导致负责网络数据读写的线程不可复用</li>
+</ol>
+</blockquote>
+<p>之后我们具体分析了Selector, SocketChannel, DirectBuffer的底层实现，指出其本质上使用的依然是底层的<code>epoll</code>,<code>poll</code>, <code>select</code>, <code>fcntl</code>这些api,<br>只是jvm做了一层封装而已。后面我们又分析了Linux中的<code>zero copy</code>技术和NIO对它的支持，底层使用的还是<code>mmap</code>和<code>send_file</code>系统调用。</p>
+<p>至此，NIO系列的核心知识基本就讲完了, 关键点就是这些。</p>
+<h1 id="2-NIO的其他知识"><a href="#2-NIO的其他知识" class="headerlink" title="2. NIO的其他知识"></a>2. NIO的其他知识</h1><p>其实NIO还有一些别的改进, 只是对服务端编程用处不大，比如<strong>Java7以后提供了全面的文件系统API支持</strong></p>
+<ul>
+<li>使用Path抽象来替代java.io.File, 代表了一个与平台无关的路径</li>
+<li>提供Files和Paths类来快捷操作文件，比如新建临时文件，删除文件等等</li>
+<li>提供WatchService来监听文件系统中的文件变化</li>
+<li>全面的基于异步Channel的IO</li>
+</ul>
+<p>举个监听文件变化的简单的例子:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 使用Path类提供的WatchService来监控文件的变化</span></span><br><span class="line"><span class="comment"> * </span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> sound2gd</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">WatchServiceTest</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">		WatchService watchService = FileSystems.getDefault().newWatchService();</span><br><span class="line">		<span class="comment">// 为C:盘根路径设置注册监听</span></span><br><span class="line">		Paths.get(<span class="string">"C:/"</span>).register(watchService, StandardWatchEventKinds.ENTRY_CREATE,</span><br><span class="line">				StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);</span><br><span class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">			<span class="comment">// 获取下一个文件变化事件</span></span><br><span class="line">			WatchKey key = watchService.take();</span><br><span class="line">			<span class="keyword">for</span> (WatchEvent&lt;?&gt; event : key.pollEvents()) &#123;</span><br><span class="line">				System.out.println(event.context()+<span class="string">" 文件发生了"</span>+event.kind()+<span class="string">"事件"</span>);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="comment">//重设watchkey</span></span><br><span class="line">			<span class="keyword">boolean</span> valid = key.reset();</span><br><span class="line">			<span class="keyword">if</span>(!valid)&#123;</span><br><span class="line">				<span class="comment">//重设失败则退出</span></span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>Java4以后, 通过NIO提供了一套基于I/O多路复用的API, 本系列就讲到这里，笔者认为服务端编程还是需要<br>比较系统的底层知识的，可以在实践中慢慢学习。</p>
+<p>使用Java语言写服务端的好处是轮子都是现成的，坏处亦如是。<br>框架屏蔽了底层细节，在高并发场景下，如果读者不知底层实现的细节，优化将无从谈起。<br>而且只看框架的话，Java学到深处就只学会了一些字节码诡计，比如javassist, asm等来做一些黑科技。</p>
+<p>也不是说它们不好，它们方便了我们的开发，当然是好事。只是作为一个服务端开发, 真正要专注的东西，笔者认为是</p>
+<ol>
+<li>软件架构知识</li>
+<li>网络通信和各种协议, 如TCP/UDP细节</li>
+<li>操作系统的知识</li>
+<li>数据结构和算法</li>
+<li>一些工程化和业务划分，异常处理的思路</li>
+</ol>
+<p>这些是和语言，框架无关的扎实知识，比如哪天你不用Java了换<code>golang</code>了依然用的是<code>epoll</code>.<br>以上，共勉.</p>
 
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/24/Java-NIO分析-11-零拷贝技术/">
-            <time datetime="2018-07-24T08:44:47.000Z" itemprop="datePublished">2018-07-24</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO-Linux/">NIO Linux</a>
-    </div>
-
-                </div>
-            </div>
+        
         </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/21/Java-NIO分析-10-堆外内存管理之DirectBuffer详解/">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/21/Java-NIO分析-10-堆外内存管理之DirectBuffer详解/">
-            <time datetime="2018-07-21T15:45:47.000Z" itemprop="datePublished">2018-07-21</time>
-        </a>
-    </div>
+        <footer class="article-footer">
+            <div class="share-container">
 
 
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
 
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
 
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/">Java NIO分析(9): 从BSD socket到SocketChannel</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/16/Java-NIO分析-9-从BSD-socket到SocketChannel/">
-            <time datetime="2018-07-15T23:56:32.000Z" itemprop="datePublished">2018-07-16</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/12/Java-NIO分析-8-Selector详解/">Java NIO分析(8): 高并发核心Selector详解</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/12/Java-NIO分析-8-Selector详解/">
-            <time datetime="2018-07-12T15:11:27.000Z" itemprop="datePublished">2018-07-12</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/10/Java-NIO分析-7-NIO核心分析之Channel-Buffer和Selector/">Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/10/Java-NIO分析-7-NIO核心分析之Channel-Buffer和Selector/">
-            <time datetime="2018-07-10T13:34:17.000Z" itemprop="datePublished">2018-07-10</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/06/Java-NIO分析-6-Java-NIO中的概念/">Java NIO分析(6): 从BIO到NIO-设计和概念</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/06/Java-NIO分析-6-Java-NIO中的概念/">
-            <time datetime="2018-07-05T23:04:55.000Z" itemprop="datePublished">2018-07-06</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/">Java NIO分析(5): I/O多路复用之epoll系统调用</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/">
-            <time datetime="2018-07-01T09:59:51.000Z" itemprop="datePublished">2018-07-01</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/">Java NIO分析(4): I/O多路复用之poll系统调用</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/">
-            <time datetime="2018-06-29T03:46:02.000Z" itemprop="datePublished">2018-06-29</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/">Java NIO分析(3): I/O多路复用之select系统调用</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/">
-            <time datetime="2018-06-28T01:48:07.000Z" itemprop="datePublished">2018-06-28</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
 </div>
 
-    <nav id="page-nav">
-        <span class="page-number current">1</span><a class="page-number" href="/categories/Java/page/2/">2</a><a class="extend next" rel="next" href="/categories/Java/page/2/">下一页 &raquo;</a>
-    </nav>
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2018/07/24/Java-NIO分析-11-零拷贝技术/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(11): 零拷贝技术以及NIO的支持</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
 </section>
             
                 
