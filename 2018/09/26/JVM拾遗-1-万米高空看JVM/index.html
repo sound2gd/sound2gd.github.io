@@ -3,20 +3,24 @@
 <head>
     <meta charset="utf-8">
     
-    <title>蜀道难 | Sound2gd的博客</title>
+    <title>JVM拾遗(1): 万米高空看JVM | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="噫吁嚱，危乎高哉！蜀道之难，难于上青天！">
-<meta name="keywords" content="李白">
+    <meta name="description" content="开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。 以前看过林林总总的JVM书籍，比如周志明大佬的&amp;lt;&amp;lt;深入理解Java虚拟机&amp;gt;&amp;gt;和张秀宏大佬的&amp;lt;&amp;lt;自己动手写Java虚拟机&amp;gt;&amp;gt;, 也跟着造了个小JVM,所以也尝试将知识整理下本系列会比较长，但是会把知">
+<meta name="keywords" content="JAVA JVM">
 <meta property="og:type" content="article">
-<meta property="og:title" content="蜀道难">
-<meta property="og:url" content="http://sound2gd.wang/2017/12/11/蜀道难/index.html">
+<meta property="og:title" content="JVM拾遗(1): 万米高空看JVM">
+<meta property="og:url" content="http://sound2gd.wang/2018/09/26/JVM拾遗-1-万米高空看JVM/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="噫吁嚱，危乎高哉！蜀道之难，难于上青天！">
+<meta property="og:description" content="开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。 以前看过林林总总的JVM书籍，比如周志明大佬的&amp;lt;&amp;lt;深入理解Java虚拟机&amp;gt;&amp;gt;和张秀宏大佬的&amp;lt;&amp;lt;自己动手写Java虚拟机&amp;gt;&amp;gt;, 也跟着造了个小JVM,所以也尝试将知识整理下本系列会比较长，但是会把知">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:updated_time" content="2017-12-12T07:52:06.000Z">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928200913.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928205459.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928211844.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-09-28T13:20:52.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="蜀道难">
-<meta name="twitter:description" content="噫吁嚱，危乎高哉！蜀道之难，难于上青天！">
+<meta name="twitter:title" content="JVM拾遗(1): 万米高空看JVM">
+<meta name="twitter:description" content="开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。 以前看过林林总总的JVM书籍，比如周志明大佬的&amp;lt;&amp;lt;深入理解Java虚拟机&amp;gt;&amp;gt;和张秀宏大佬的&amp;lt;&amp;lt;自己动手写Java虚拟机&amp;gt;&amp;gt;, 也跟着造了个小JVM,所以也尝试将知识整理下本系列会比较长，但是会把知">
+<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928200913.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -196,7 +200,7 @@ var _hmt = _hmt || [];
 </aside>
 
             
-            <section id="main"><article id="post-蜀道难" class="article article-type-post" itemscope itemprop="blogPost">
+            <section id="main"><article id="post-JVM拾遗-1-万米高空看JVM" class="article article-type-post" itemscope itemprop="blogPost">
     <div class="article-inner">
         
         
@@ -204,7 +208,7 @@ var _hmt = _hmt || [];
                 
     
         <h1 class="article-title" itemprop="name">
-            蜀道难
+            JVM拾遗(1): 万米高空看JVM
         </h1>
     
 
@@ -213,8 +217,8 @@ var _hmt = _hmt || [];
                         
     <div class="article-date">
         <i class="fa fa-calendar"></i>
-        <a href="/2017/12/11/蜀道难/">
-            <time datetime="2017-12-11T07:45:38.000Z" itemprop="datePublished">2017-12-11</time>
+        <a href="/2018/09/26/JVM拾遗-1-万米高空看JVM/">
+            <time datetime="2018-09-26T11:24:09.000Z" itemprop="datePublished">2018-09-26</time>
         </a>
     </div>
 
@@ -222,13 +226,13 @@ var _hmt = _hmt || [];
                         
     <div class="article-category">
     	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/诗词鉴赏/">诗词鉴赏</a>
+        <a class="article-category-link" href="/categories/JVM/">JVM</a>
     </div>
 
                         
     <div class="article-tag">
         <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/李白/">李白</a>
+        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
     </div>
 
                     </div>
@@ -239,11 +243,42 @@ var _hmt = _hmt || [];
         <div class="article-entry" itemprop="articleBody">
         
             
-            <p>噫吁嚱，危乎高哉！蜀道之难，难于上青天！<br><a id="more"></a><br>蚕丛及鱼凫，开国何茫然！尔来四万八千岁，不与秦塞通人烟。西当太白有鸟道，可以横绝峨眉巅。地崩山摧壮士死，然后天梯石栈相钩连。</p>
-<p>上有六龙回日之高标，下有冲波逆折之回川。黄鹤之飞尚不得过，猿猱欲度愁攀援。青泥何盘盘，百步九折萦岩峦。扪参历井仰胁息，以手抚膺坐长叹。</p>
-<p>问君西游何时还？畏途巉岩不可攀。但见悲鸟号古木，雄飞雌从绕林间。又闻子规啼夜月，愁空山。蜀道之难，难于上青天，使人听此凋朱颜。</p>
-<p>连峰去天不盈尺，枯松倒挂倚绝壁。飞湍瀑流争喧豗，砯崖转石万壑雷。其险也如此，嗟尔远道之人胡为乎来哉！</p>
-<p>剑阁峥嵘而崔嵬，一夫当关，万夫莫开。所守或匪亲，化为狼与豺。朝避猛虎，夕避长蛇；磨牙吮血，杀人如麻。锦城虽云乐，不如早还家。蜀道之难，难于上青天，侧身西望长咨嗟！</p>
+            <p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。<br>关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。</p>
+<p>以前看过林林总总的JVM书籍，比如周志明大佬的<code>&lt;&lt;深入理解Java虚拟机&gt;&gt;</code>和张秀宏大佬的<code>&lt;&lt;自己动手写Java虚拟机&gt;&gt;</code>, 也跟着造了个小JVM,所以也尝试将知识整理下<br>本系列会比较长，但是会把知识点细分，前后贯通串起来。<br>如果没有特殊指出，JVM使用的是<a href="https://en.wikipedia.org/wiki/HotSpot" target="_blank" rel="noopener">Hotspot VM</a>,JDK使用的是<a href="http://openjdk.java.net" target="_blank" rel="noopener">OpenJDK8</a></p>
+<a id="more"></a>
+<h1 id="1-JVM是什么"><a href="#1-JVM是什么" class="headerlink" title="1. JVM是什么"></a>1. JVM是什么</h1><p>JVM的全称是<strong>Java Virtual Machine</strong>,也就是<strong>Java虚拟机</strong>, 1995年Java发布1.0的时候，提出了一个<code>Write Once, Run Anywhere</code>的口号，所以要保证Java的平台<br>无关性。然而物理机只认机器码, 有伟人说过: <code>计算机科学领域的任何问题都可以通过增加一个间接的中间层来解决</code>, 既然物理机只认机器码，那么我们加一层抽象，这层抽象和平台有关<br>，然后再其上定义自己的统一格式，不就达到目的了吗。</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928200913.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>没错，这层抽象就是JVM, 这个平台无关的”代码指令“就是class文件.</p>
+<h1 id="2-内存管理"><a href="#2-内存管理" class="headerlink" title="2. 内存管理"></a>2. 内存管理</h1><p>JVM是一个带有GC(Garbage Collect)的虚拟机, 和传统的c/c++不一样，对象的创建和释放不需要开发者手动操作，不容易出现内存泄漏和溢出的问题。<br>开发者不太用关心的事情，就交给JVM了。然而软件开发没有银弹，排查内存泄漏的时候，如果不了解一些gc的细节，将会很艰难。后面会详细聊gc有关的知识。</p>
+<h2 id="JVM内存区域结构"><a href="#JVM内存区域结构" class="headerlink" title="JVM内存区域结构"></a>JVM内存区域结构</h2><p><a href="https://docs.oracle.com/javase/specs/jvms/se8/jvms8.pdf" target="_blank" rel="noopener">JVM8规范</a>里将内存区域划分为</p>
+<ul>
+<li>PC寄存器</li>
+<li>JVM栈</li>
+<li>堆</li>
+<li>方法区</li>
+<li>运行时常量池</li>
+<li>本地方法栈</li>
+</ul>
+<p>如果是学过<code>CSAPP</code>的老司机, 看到PC寄存器就立马知道这是干什么的，JVM模拟的是真实的物理机架构，class文件内容就是机器指令, JVM就是CPU和内存，PC寄存器放的是当前线程执行到的”代码位置”</p>
+<p>JVM栈是用来模拟计算机的寄存器结构的，寄存器是CPU的运算单元，多个种类的寄存器配合一起工作才能完成计算. 比如某x86架构的汇编指令</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">movq %rax, (%rbx)</span><br></pre></td></tr></table></figure>
+<p>表示把寄存器rbx的地址保存到rax寄存器中，但是汇编指令是和硬件相关的，所以不方便移植. 反而是基于虚拟栈的架构, 可移植性比较强。JVM采用的就是这种方式。栈里面是栈帧，栈帧里有局部变量表和操作数，动态链接等信息.</p>
+<p>JVM栈是线程私有的，每个线程有自己的栈.</p>
+<p><code>堆</code>也是Javaer耳熟能详的内存区域了, <code>new</code>出来的对象，就是在这里分配的，<code>堆</code>是被所有线程所共享的那部分区域, 这里也是gc主要发生的区域。</p>
+<p><code>方法区</code>也是各个线程共享的区域，用于存储已经被JVM加载的类，常量，JIT后的代码等数据。几乎不会发生gc.</p>
+<p><code>运行时常量池</code>是<code>方法区的一部分</code>, 常量池(Constant Pool)一般是在class文件里的，class的常量池存放了一个类的各种字段长度方法名字之类的信息, 学术点讲叫<code>符号引用</code>和<code>字面量</code>.</p>
+<p><code>本地方法栈</code>是为c/c++等传统技术栈准备的，对于java来讲，c就是”本地”方法，因为很早以前java是靠c来解释执行的, 类似于寄生在c上， 现在jvm也是用c++实现的。</p>
+<p>一张图说明问题</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928205459.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<h1 id="3-大好Hello-World如何执行"><a href="#3-大好Hello-World如何执行" class="headerlink" title="3. 大好Hello World如何执行"></a>3. 大好Hello World如何执行</h1><p>回过头来举个现实点的例子来整体把握JVM，如我们常用的<code>HelloWorld.java</code>,</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HelloWorld</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        System.out.println(<span class="string">"Hello World"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>首先，我们需要把HelloWorld.java编译成HelloWorld.class,然后就可以运行了</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ javac HelloWorld.java</span><br><span class="line">$ java HelloWorld</span><br><span class="line">Hello World</span><br></pre></td></tr></table></figure>
+<p><code>main</code>方法是JVM预留的程序执行入口，JVM启动之后会先装载自己的类, 如<code>java.lang.Object</code>, 然后再加载我们自定义的HelloWorld类<br>加载完成之后，<code>方法区</code>里就有HelloWorld类的字节码了，字节码里有我们main方法的代码，我们可以用<code>javap</code>来反编译class文件</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// javap -c HelloWorld</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HelloWorld</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="title">HelloWorld</span><span class="params">()</span></span>;</span><br><span class="line">    Code:</span><br><span class="line">       <span class="number">0</span>: aload_0</span><br><span class="line">       1: invokespecial #1                  // Method java/lang/Object."&lt;init&gt;":()V</span><br><span class="line">       <span class="number">4</span>: <span class="keyword">return</span></span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(java.lang.String[])</span></span>;</span><br><span class="line">    Code:</span><br><span class="line">       0: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;</span><br><span class="line">       3: ldc           #3                  // String Hello World</span><br><span class="line">       5: invokevirtual #4                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V</span><br><span class="line">       <span class="number">8</span>: <span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>字节码的含义这里不多讲，后面会细讲。<br>执行的过程就是jvm会从上到下依次执行指令，直到所有的指令执行完毕,虚拟机退出。</p>
+<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/09/28/20180928211844.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<h1 id="4-总结"><a href="#4-总结" class="headerlink" title="4. 总结"></a>4. 总结</h1><p>本篇从什么是JVM开始，介绍了Java虚拟机的由来: 用于做平台无关性的抽象的，同时还介绍了自动内存管理机制里的gc和内存区域划分，从整体上把握JVM, 最后通过一个HelloWorld的小例子提升对JVM的感性认识。</p>
 
         
         </div>
@@ -316,15 +351,11 @@ var _hmt = _hmt || [];
         
 <nav id="article-nav">
     
-        <a href="/2017/12/15/使用clj1-9快速启动repl/" id="article-nav-newer" class="article-nav-link-wrap">
-            <strong class="article-nav-caption">上一篇</strong>
-            <div class="article-nav-title">
-                
-                    使用clj1.9快速启动clojure的repl
-                
-            </div>
-        </a>
     
+        <a href="/2018/07/31/Java-NIO分析-12-NIO总结/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">Java NIO分析(12): NIO总结</div>
+        </a>
     
 </nav>
 
