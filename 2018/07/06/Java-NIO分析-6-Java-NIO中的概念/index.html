@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="Sound2gd的博客">
 <meta property="og:description" content="前面介绍了Unix的I/O模型以及多路复用的c实现，为什么要介绍这些呢？ 因为JVM是用c++写的，JDK的native方法也都是用c写的，最后它们调用的还是操作系统底层的api,所以了解一些关键的底层原理还是有必要的。">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/06/20180706074513.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/09/20180709160855.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2018-07-09T08:20:50.000Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/07/06/20180706074513.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/07/09/20180709160855.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-10-25T04:57:28.571Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Java NIO分析(6): 从BIO到NIO-设计和概念">
 <meta name="twitter:description" content="前面介绍了Unix的I/O模型以及多路复用的c实现，为什么要介绍这些呢？ 因为JVM是用c++写的，JDK的native方法也都是用c写的，最后它们调用的还是操作系统底层的api,所以了解一些关键的底层原理还是有必要的。">
-<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -261,12 +261,12 @@ var _hmt = _hmt || [];
 </ul>
 <h2 id="1-4-BIO介绍"><a href="#1-4-BIO介绍" class="headerlink" title="1.4 BIO介绍"></a>1.4 BIO介绍</h2><p>在jdk1.4之前，Java的I/O是使用<strong>基于流的抽象模型</strong>来做的，IO流模型是把设备抽象成一个个管道，管道里每个数据单元依次排列,这是一种<strong>同步阻塞模型</strong>. </p>
 <p>类似于一个自来水管，源头放在数据源上，出口是你的Java程序。<br>流是有方向的，水流出去了就没法让它流回来。</p>
-<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p><img src="http://img.sound2gd.wang/2018/07/07/20180707085301.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
 <p>最基础的2个抽象是<code>InputStream</code>和<code>OutputStream</code>,I/O流都使用了隐式的指针来记录当前准备从哪个数据单元读取，其余的类功能都是在这两个类的基础上做装饰的。</p>
 <p>例如为了简化操作提高I/O效率的<code>BufferedInputStreamReader</code>，一次java函数调用就能读写大量的内容(应用层看来)，而不是每次处理一个数据单元。</p>
 <h1 id="2-BIO的局限"><a href="#2-BIO的局限" class="headerlink" title="2. BIO的局限"></a>2. BIO的局限</h1><p>JDK1.4之前，java的io包里的输入流和输出流抽象都是<strong>面向流的模型</strong>, 一次只能处理一个字节，效率不高，并且会阻塞进/线程。</p>
 <p>在网络编程中，BIO没有引入I/O多路复用模型，并且BIO里的方法都是同步阻塞的，所以通常都是起一个accepter线程去阻塞监听客户端连接,接收到请求之后起一个新的线程去处理。</p>
-<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/06/20180706074513.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt="BIO server"></p>
+<p><img src="http://img.sound2gd.wang/2018/07/06/20180706074513.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt="BIO server"></p>
 <p>这样有几个明显的缺点:</p>
 <ol>
 <li>客户端连接很多的时候，会创建大量的处理线程，每创建一个线程都需要分配一定的栈空间,一般是1K~1M,那么4G内存也只能起4000~40000个线程。</li>
@@ -296,7 +296,7 @@ var _hmt = _hmt || [];
 <li>AWT的ActionListener —&gt; <code>Handlers</code>, 执行非阻塞操作</li>
 <li>AWT的addActionListener —-&gt; handler绑定事件</li>
 </ul>
-<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/07/09/20180709160855.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p><img src="http://img.sound2gd.wang/2018/07/09/20180709160855.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
 <p>在NIO中，它们的概念实现分别是(NIO网络核心):</p>
 <ul>
 <li><code>Channel</code>, 对非阻塞的支持, <code>Channel</code>可以连接文件，socket等</li>

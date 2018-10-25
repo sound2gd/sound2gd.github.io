@@ -13,16 +13,16 @@
 <meta property="og:site_name" content="Sound2gd的博客">
 <meta property="og:description" content="要谈Java的NIO, 还是先从I/O开始说起。Unix提供了5种不同的I/O模型，分别是  阻塞I/O(blocking I/O) 非阻塞I/O(non-blocking I/O) I/O复用(I/O multiplexing) 信号驱动式I/O(signal-driven I/O) 异步I/O(asynchronous I/O)">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614162220.png">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614163211.png">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614164628.png">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614165238.png">
-<meta property="og:updated_time" content="2018-06-14T09:09:10.000Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/06/14/20180614161508.png">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/06/14/20180614162220.png">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/06/14/20180614163211.png">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/06/14/20180614164628.png">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/06/14/20180614165238.png">
+<meta property="og:updated_time" content="2018-10-25T04:57:28.569Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Java NIO分析(1): Unix网络模型">
 <meta name="twitter:description" content="要谈Java的NIO, 还是先从I/O开始说起。Unix提供了5种不同的I/O模型，分别是  阻塞I/O(blocking I/O) 非阻塞I/O(non-blocking I/O) I/O复用(I/O multiplexing) 信号驱动式I/O(signal-driven I/O) 异步I/O(asynchronous I/O)">
-<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2018/06/14/20180614161508.png">
     
 
     
@@ -260,7 +260,7 @@ var _hmt = _hmt || [];
 <li>从内核向进程复制数据</li>
 </ol>
 <p>对于socket I/O而言，第一步通常是等待数据从网络中到达，到达之后会复制到内核的某个缓冲区<br>第二布就是从内核缓冲区复制到应用进程缓冲区</p>
-<h2 id="阻塞I-O"><a href="#阻塞I-O" class="headerlink" title="阻塞I/O"></a>阻塞I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614161508.png" alt=""></p>
+<h2 id="阻塞I-O"><a href="#阻塞I-O" class="headerlink" title="阻塞I/O"></a>阻塞I/O</h2><p><img src="http://img.sound2gd.wang/2018/06/14/20180614161508.png" alt=""></p>
 <p>默认情况下，所有的socket都是阻塞的. 如图所示</p>
 <ol>
 <li>应用发起recvfrom这个系统调用, 应用被阻塞</li>
@@ -269,10 +269,10 @@ var _hmt = _hmt || [];
 <li>应用从阻塞里恢复，处理数据</li>
 </ol>
 <p>这也是理解和编程起来比较简单的模型，所以计算机早期用的很多,现在在处理超大文件的时候，也依然适用于这种模型。</p>
-<h2 id="非阻塞I-O"><a href="#非阻塞I-O" class="headerlink" title="非阻塞I/O"></a>非阻塞I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614162220.png" alt=""></p>
+<h2 id="非阻塞I-O"><a href="#非阻塞I-O" class="headerlink" title="非阻塞I/O"></a>非阻塞I/O</h2><p><img src="http://img.sound2gd.wang/2018/06/14/20180614162220.png" alt=""></p>
 <p>相比于<code>Blocking I/O</code>, <code>Non-Blocking I/O</code>的<strong>等待数据</strong>阶段不会被阻塞，也就是说操作系统不会挂起应用, 应用<br>不断<code>轮询(polling)</code>内核看是否数据准备好。某次轮询发现准备好了，再直接发系统调用阻塞取数据.</p>
 <p><code>Unix网络编程</code>里对<code>轮询</code>的定义是:<br><strong>应用进程对非阻塞描述符循环发送系统调用，以查看某个操作是否就绪</strong></p>
-<h2 id="I-O多路复用"><a href="#I-O多路复用" class="headerlink" title="I/O多路复用"></a>I/O多路复用</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614163211.png" alt=""><br>在处理非常多的描述符的时候，I/O多路复用技术显得非常有用。I/O多路复用需要发送2次系统调用:</p>
+<h2 id="I-O多路复用"><a href="#I-O多路复用" class="headerlink" title="I/O多路复用"></a>I/O多路复用</h2><p><img src="http://img.sound2gd.wang/2018/06/14/20180614163211.png" alt=""><br>在处理非常多的描述符的时候，I/O多路复用技术显得非常有用。I/O多路复用需要发送2次系统调用:</p>
 <ol>
 <li>select或者poll, 获取可读条件, 等待描述符变成可读</li>
 <li>发起recvfrom系统调用，内核复制数据到应用。</li>
@@ -284,7 +284,7 @@ var _hmt = _hmt || [];
 <li>一个TCP服务器既要监听socket，又要处理已连接socket</li>
 </ul>
 <p>这些场景下，多发的这次系统调用能带来更高的I/O处理效率，能更均匀的使用服务器时间片, 处理更多连接。<br>常用的方法是把I/O多路复用和非阻塞I/O结合使用，这样应用进程不需要阻塞，能处理别的业务，同时又能够处理多个I/O请求</p>
-<h2 id="信号驱动I-O"><a href="#信号驱动I-O" class="headerlink" title="信号驱动I/O"></a>信号驱动I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614164628.png" alt=""></p>
+<h2 id="信号驱动I-O"><a href="#信号驱动I-O" class="headerlink" title="信号驱动I/O"></a>信号驱动I/O</h2><p><img src="http://img.sound2gd.wang/2018/06/14/20180614164628.png" alt=""></p>
 <p>信号模型的步骤是:</p>
 <ol>
 <li>应用进程发起一个信号，告诉内核要什么文件，然后立马返回</li>
@@ -292,7 +292,7 @@ var _hmt = _hmt || [];
 <li>应用进程收到信号发起recvfrom系统调用来阻塞取数据</li>
 </ol>
 <p>信号驱动模型类似于你去一点点买奶茶，对方给你一个小票。<br>什么时候好了对方喊xx号(这就是信号)好了.然后你来取奶茶(recvfrom取数据)</p>
-<h2 id="异步I-O"><a href="#异步I-O" class="headerlink" title="异步I/O"></a>异步I/O</h2><p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/06/14/20180614165238.png" alt=""></p>
+<h2 id="异步I-O"><a href="#异步I-O" class="headerlink" title="异步I/O"></a>异步I/O</h2><p><img src="http://img.sound2gd.wang/2018/06/14/20180614165238.png" alt=""></p>
 <p>步骤：</p>
 <ol>
 <li>应用进程发起aio_read系统调用，告诉内核要什么文件，然后立马返回</li>

@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="Sound2gd的博客">
 <meta property="og:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2018-08-06T05:17:56.000Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-10-25T04:57:28.578Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Java NIO分析(12): NIO总结">
 <meta name="twitter:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
-<meta name="twitter:image" content="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -244,7 +244,7 @@ var _hmt = _hmt || [];
             <p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧<br>写这个系列的起因是各个框架比如<code>netty</code>, <code>tomcat</code>, <code>jetty</code>这些高性能框架的<br>基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p>
 <a id="more"></a>
 <h1 id="1-NIO网络编程体系"><a href="#1-NIO网络编程体系" class="headerlink" title="1. NIO网络编程体系"></a>1. NIO网络编程体系</h1><p>本系列主要是讲NIO网络编程相关的，因为Java服务端开发最关心的就是这些。<br><strong>我们记不住孤立的事实， 知识得体系化</strong>. 这里上一张笔者写本系列画的脑图</p>
-<p><img src="http://7xox4k.com1.z0.glb.clouddn.com/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p><img src="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
 <p>笔者先从Unix网络编程开始, 讲了5种IO模型，</p>
 <ul>
 <li>阻塞I/O(blocking I/O)</li>
