@@ -3,22 +3,22 @@
 <head>
     <meta charset="utf-8">
     
-    <title>Java NIO分析(12): NIO总结 | Sound2gd的博客</title>
+    <title>JVM拾遗(2): 平台无关性基石之Class解析 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
-<meta name="keywords" content="NIO">
+    <meta name="description" content="博客备案了一个月，中途也有各种工作的事情，现在继续更新。前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。 这次谈谈Java的平台无关性的基石: Class文件。">
+<meta name="keywords" content="JAVA JVM">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Java NIO分析(12): NIO总结">
-<meta property="og:url" content="http://sound2gd.wang/2018/07/31/Java-NIO分析-12-NIO总结/index.html">
+<meta property="og:title" content="JVM拾遗(2): 平台无关性基石之Class解析">
+<meta property="og:url" content="http://sound2gd.wang/2018/10/25/JVM拾遗-2-平台无关性基石之Class解析/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
+<meta property="og:description" content="博客备案了一个月，中途也有各种工作的事情，现在继续更新。前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。 这次谈谈Java的平台无关性的基石: Class文件。">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:image" content="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2018-10-25T04:57:28.578Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2018/10/26/WechatIMG136.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2018-10-26T03:14:38.134Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Java NIO分析(12): NIO总结">
-<meta name="twitter:description" content="迟来的总结，NIO系列写了11篇了，本篇做个总结吧写这个系列的起因是各个框架比如netty, tomcat, jetty这些高性能框架的基石就是NIO, 一直想讲讲它们高性能的原因。">
-<meta name="twitter:image" content="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta name="twitter:title" content="JVM拾遗(2): 平台无关性基石之Class解析">
+<meta name="twitter:description" content="博客备案了一个月，中途也有各种工作的事情，现在继续更新。前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。 这次谈谈Java的平台无关性的基石: Class文件。">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2018/10/26/WechatIMG136.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -198,7 +198,7 @@ var _hmt = _hmt || [];
 </aside>
 
             
-            <section id="main"><article id="post-Java-NIO分析-12-NIO总结" class="article article-type-post" itemscope itemprop="blogPost">
+            <section id="main"><article id="post-JVM拾遗-2-平台无关性基石之Class解析" class="article article-type-post" itemscope itemprop="blogPost">
     <div class="article-inner">
         
         
@@ -206,7 +206,7 @@ var _hmt = _hmt || [];
                 
     
         <h1 class="article-title" itemprop="name">
-            Java NIO分析(12): NIO总结
+            JVM拾遗(2): 平台无关性基石之Class解析
         </h1>
     
 
@@ -215,8 +215,8 @@ var _hmt = _hmt || [];
                         
     <div class="article-date">
         <i class="fa fa-calendar"></i>
-        <a href="/2018/07/31/Java-NIO分析-12-NIO总结/">
-            <time datetime="2018-07-30T16:11:50.000Z" itemprop="datePublished">2018-07-31</time>
+        <a href="/2018/10/25/JVM拾遗-2-平台无关性基石之Class解析/">
+            <time datetime="2018-10-25T05:08:50.000Z" itemprop="datePublished">2018-10-25</time>
         </a>
     </div>
 
@@ -224,13 +224,13 @@ var _hmt = _hmt || [];
                         
     <div class="article-category">
     	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/Java/">Java</a>
+        <a class="article-category-link" href="/categories/JVM/">JVM</a>
     </div>
 
                         
     <div class="article-tag">
         <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/NIO/">NIO</a>
+        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
     </div>
 
                     </div>
@@ -241,52 +241,33 @@ var _hmt = _hmt || [];
         <div class="article-entry" itemprop="articleBody">
         
             
-            <p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧<br>写这个系列的起因是各个框架比如<code>netty</code>, <code>tomcat</code>, <code>jetty</code>这些高性能框架的<br>基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p>
+            <p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。<br>前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是<br>先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。</p>
+<p>这次谈谈Java的平台无关性的基石: <code>Class</code>文件。</p>
 <a id="more"></a>
-<h1 id="1-NIO网络编程体系"><a href="#1-NIO网络编程体系" class="headerlink" title="1. NIO网络编程体系"></a>1. NIO网络编程体系</h1><p>本系列主要是讲NIO网络编程相关的，因为Java服务端开发最关心的就是这些。<br><strong>我们记不住孤立的事实， 知识得体系化</strong>. 这里上一张笔者写本系列画的脑图</p>
-<p><img src="http://img.sound2gd.wang/2018/08/06/20180806105257.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
-<p>笔者先从Unix网络编程开始, 讲了5种IO模型，</p>
+<h1 id="1-简介"><a href="#1-简介" class="headerlink" title="1. 简介"></a>1. 简介</h1><p>机器是只认<strong>机器码</strong>的，所谓的机器码, 就是机器认的一堆<strong>有特殊意义的二进制指令</strong>。<br>这些二进制指令的语义是由具体机器CPU的<strong>指令集架构</strong>(Instruction Set Architecture)来规定的。这些指令集都是和具体的CPU系列是强相关的，比如x86的指令集换到arm上就玩不转。这对程序的可移植性和维护性都带来了很大的挑战，同一份逻辑要散落在各个平台, 很肯能就漏改了某一处逻辑。</p>
+<p>所以过去那个年代有人提出了<code>write once, run anywhere</code>的口号，然后java诞生了。java的跨平台性是靠jvm来提供的。<br>JVM是一层用来屏蔽平台无关性的抽象, JVM本身是和平台强相关的, JVM作为虚拟的机器，也抽象出了一套自己的“指令集”.<br>但是这些指令又不是机器码一样能直接执行，还需要一些额外的信息，例如常量，栈帧，异常等信息, 以满足java等高级语言的语法和语义<br>这些信息就都存在class文件里。</p>
+<p>事实上，在java发展之初，设计者就考虑过让其他语言运行在jvm，<code>&lt;&lt;Java虚拟机规范&gt;&gt;</code>和<code>&lt;&lt;Java语言规范&gt;&gt;</code>是分开发布的，第一版jvm规范也说过:<br><code>in the future, we will consider bounded extensions to the java virtual machine to provide better support for other languages</code>.</p>
+<h2 id="class可能的设计思路"><a href="#class可能的设计思路" class="headerlink" title="class可能的设计思路"></a>class可能的设计思路</h2><p>class文件作为实现平台无关性的基石，猜测要做到以下几点</p>
 <ul>
-<li>阻塞I/O(blocking I/O)</li>
-<li>非阻塞I/O(non-blocking I/O)</li>
-<li>I/O复用(I/O multiplexing)</li>
-<li>信号驱动式I/O(signal-driven I/O)</li>
-<li>异步I/O(asynchronous I/O)</li>
+<li>语义: 能完整的表达出Java的语义</li>
+<li>紧凑: 早期的计算机内存很小，性能很差，class文件需要尽量占少的空间, 尽可能小</li>
+<li>安全性: 既要保证java的语法语义不被破坏，又要确保错误的格式得到虚拟机正确的处理</li>
+<li>可扩展: java在发展，class也要跟上</li>
 </ul>
-<p>并指出所有的I/O模型都要经历2个阶段，即<code>数据准备</code>和<code>内核拷贝数据到应用进程</code><br>异步I/O模型虽然效率高，但是编程复杂，在实际用的不算多。前四种模型的区别主要在第一阶段数据准备<br>第二阶段拷贝数据都会阻塞。</p>
-<p>I/O多路复用是使用最广泛的I/O模型，内核帮助你完成了<code>Event Loop</code>, 你<code>select</code>之后得到的就是<br>已经准备就绪的fd集合.</p>
-<p>接下来研究了下I/O多路复用的历史，知道了没有Socket和select之前的黑历史，全靠进程的fork来完成<br>进程之间的通信，一个负责读一个负责写，还经常有同步问题, 更早的还有非分时操作系统，那个感兴趣的<br>可以自己去维基百科瞅瞅。</p>
-<p>在<a href="/2018/06/28/Java-NIO分析-3-I-O多路复用之select系统调用/" title="Java NIO分析(3): I/O多路复用之select系统调用">Java NIO分析(3): I/O多路复用之select系统调用</a> ,<a href="/2018/06/29/Java-NIO分析-4-I-O多路复用之poll系统调用/" title="Java NIO分析(4): I/O多路复用之poll系统调用">Java NIO分析(4): I/O多路复用之poll系统调用</a> , <a href="/2018/07/01/Java-NIO分析-5-I-O多路复用之epoll系统调用/" title="Java NIO分析(5): I/O多路复用之epoll系统调用">Java NIO分析(5): I/O多路复用之epoll系统调用</a>里举了几个实际的使用I/O多路复用的api例子，看了下我们是如何在操作系统提供的api上具体使用多路复用的。</p>
-<p>以上基础完成之后，我们介绍了NIO的一些基本概念，如<strong>同步异步，阻塞非阻塞</strong>， 并指出<code>阻塞</code>和<code>非阻塞</code>关注的是<strong>应用进程在等待调用结果时的状态</strong>, 而<code>同步</code>和<code>异步</code>关注的是<strong>通信</strong>.再从BIO的设计和缺陷开始讲起，引出为什么要搞NIO.</p>
-<blockquote>
-<ol>
-<li>客户端连接很多的时候，会创建大量的处理线程，每创建一个线程都需要分配一定的栈空间,一般是1K~1M,那么4G内存也只能起4000~40000个线程。</li>
-<li>线程多导致上下文切换严重</li>
-<li>阻塞导致负责网络数据读写的线程不可复用</li>
-</ol>
-</blockquote>
-<p>之后我们具体分析了Selector, SocketChannel, DirectBuffer的底层实现，指出其本质上使用的依然是底层的<code>epoll</code>,<code>poll</code>, <code>select</code>, <code>fcntl</code>这些api,<br>只是jvm做了一层封装而已。后面我们又分析了Linux中的<code>zero copy</code>技术和NIO对它的支持，底层使用的还是<code>mmap</code>和<code>send_file</code>系统调用。</p>
-<p>至此，NIO系列的核心知识基本就讲完了, 关键点就是这些。</p>
-<h1 id="2-NIO的其他知识"><a href="#2-NIO的其他知识" class="headerlink" title="2. NIO的其他知识"></a>2. NIO的其他知识</h1><p>其实NIO还有一些别的改进, 只是对服务端编程用处不大，比如<strong>Java7以后提供了全面的文件系统API支持</strong></p>
-<ul>
-<li>使用Path抽象来替代java.io.File, 代表了一个与平台无关的路径</li>
-<li>提供Files和Paths类来快捷操作文件，比如新建临时文件，删除文件等等</li>
-<li>提供WatchService来监听文件系统中的文件变化</li>
-<li>全面的基于异步Channel的IO</li>
-</ul>
-<p>举个监听文件变化的简单的例子:</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 使用Path类提供的WatchService来监控文件的变化</span></span><br><span class="line"><span class="comment"> * </span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> sound2gd</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">WatchServiceTest</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">		WatchService watchService = FileSystems.getDefault().newWatchService();</span><br><span class="line">		<span class="comment">// 为C:盘根路径设置注册监听</span></span><br><span class="line">		Paths.get(<span class="string">"C:/"</span>).register(watchService, StandardWatchEventKinds.ENTRY_CREATE,</span><br><span class="line">				StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);</span><br><span class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">			<span class="comment">// 获取下一个文件变化事件</span></span><br><span class="line">			WatchKey key = watchService.take();</span><br><span class="line">			<span class="keyword">for</span> (WatchEvent&lt;?&gt; event : key.pollEvents()) &#123;</span><br><span class="line">				System.out.println(event.context()+<span class="string">" 文件发生了"</span>+event.kind()+<span class="string">"事件"</span>);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="comment">//重设watchkey</span></span><br><span class="line">			<span class="keyword">boolean</span> valid = key.reset();</span><br><span class="line">			<span class="keyword">if</span>(!valid)&#123;</span><br><span class="line">				<span class="comment">//重设失败则退出</span></span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>Java4以后, 通过NIO提供了一套基于I/O多路复用的API, 本系列就讲到这里，笔者认为服务端编程还是需要<br>比较系统的底层知识的，可以在实践中慢慢学习。</p>
-<p>使用Java语言写服务端的好处是轮子都是现成的，坏处亦如是。<br>框架屏蔽了底层细节，在高并发场景下，如果读者不知底层实现的细节，优化将无从谈起。<br>而且只看框架的话，Java学到深处就只学会了一些字节码诡计，比如javassist, asm等来做一些黑科技。</p>
-<p>也不是说它们不好，它们方便了我们的开发，当然是好事。只是作为一个服务端开发, 真正要专注的东西，笔者认为是</p>
-<ol>
-<li>软件架构知识</li>
-<li>网络通信和各种协议, 如TCP/UDP细节</li>
-<li>操作系统的知识</li>
-<li>数据结构和算法</li>
-<li>一些工程化和业务划分，异常处理的思路</li>
-</ol>
-<p>这些是和语言，框架无关的扎实知识，比如哪天你不用Java了换<code>golang</code>了依然用的是<code>epoll</code>.<br>以上，共勉.</p>
+<h1 id="2-class文件的结构"><a href="#2-class文件的结构" class="headerlink" title="2. class文件的结构"></a>2. class文件的结构</h1><p>基于以上原则，class文件是以二进制形式存储，并严格的规范了各个字段的语义, 兼容性和检查方法<br>每个class文件都只代表一个类或者接口，java中一个类的信息主要有<strong>字段(fields)</strong>和<strong>方法(method)</strong>, 还有继承自哪个类，实现了哪些接口等等<br>class文件也对应的给出了存储的结构.</p>
+<p>jvm8规范给出的结构如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">// u代表unsigned byte, 无符号字节, 占8位</span><br><span class="line">ClassFile &#123;</span><br><span class="line">    u4             magic;</span><br><span class="line">    u2             minor_version;</span><br><span class="line">    u2             major_version;</span><br><span class="line">    u2             constant_pool_count;</span><br><span class="line">    cp_info        constant_pool[constant_pool_count-1];</span><br><span class="line">    u2             access_flags;</span><br><span class="line">    u2             this_class;</span><br><span class="line">    u2             super_class;</span><br><span class="line">    u2             interfaces_count;</span><br><span class="line">    u2             interfaces[interfaces_count];</span><br><span class="line">    u2             fields_count;</span><br><span class="line">    field_info     fields[fields_count];</span><br><span class="line">    u2             methods_count;</span><br><span class="line">    method_info    methods[methods_count];</span><br><span class="line">    u2             attributes_count;</span><br><span class="line">    attribute_info attributes[attributes_count];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="http://img.sound2gd.wang/2018/10/26/WechatIMG136.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>其中<code>magic</code>代表文件类型，任何文件的前4个字节都是<code>magic number</code>, java的魔数是<code>0xCAFEBABE</code>, 咖啡宝贝, 程序员式的浪漫:)<br><code>minor_version</code>和<code>major_version</code>代表的是class的版本号，虚拟机会根据版本号做一些兼容性判断，比如1.4的虚拟机不能执行1.8的字节码<br>后面的<code>this_class</code>,<code>super_class</code>, <code>interfaces</code>, <code>fields</code>, <code>methods</code>存的就是当前类名，父类名，实现的接口们，字段和方法大全，都是诸位<br>javaer耳熟能详的东西。</p>
+<h2 id="常量池"><a href="#常量池" class="headerlink" title="常量池"></a>常量池</h2><p>上面有一块比较重要，在虚拟机规范里甚至单独提出来作为运行时内存区域的一部分, 这部分就是<code>运行时常量池</code><br>常量池数据是源自class文件中的常量池的，也就是上面结构里的<code>constant_pool</code>, java源码里的方法签名，裸字符串，数字, 方法引用, 字段引用等都会被编译后放到<br>class文件的这个结构里。</p>
+<p>举个栗子:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">public class HelloWorld implements java.io.Serializable&#123;</span><br><span class="line">  private String str = &quot;Hello&quot;;</span><br><span class="line"></span><br><span class="line">  @Deprecated</span><br><span class="line">  public void testMethod() &#123;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><code>javap -v HelloWorld</code>反编译之后可以得到<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">Constant pool:</span><br><span class="line">   #1 = Methodref          #5.#19         // java/lang/Object.&quot;&lt;init&gt;&quot;:()V</span><br><span class="line">   #2 = String             #20            // Hello</span><br><span class="line">   #3 = Fieldref           #4.#21         // HelloWorld.str:Ljava/lang/String;</span><br><span class="line">   #4 = Class              #22            // HelloWorld</span><br><span class="line">   #5 = Class              #23            // java/lang/Object</span><br><span class="line">   #6 = Class              #24            // java/io/Serializable</span><br><span class="line">   #7 = Utf8               str</span><br><span class="line">   #8 = Utf8               Ljava/lang/String;</span><br><span class="line">   #9 = Utf8               &lt;init&gt;</span><br><span class="line">  #10 = Utf8               ()V</span><br><span class="line">  #11 = Utf8               Code</span><br><span class="line">  #12 = Utf8               LineNumberTable</span><br><span class="line">  #13 = Utf8               testMethod</span><br><span class="line">  #14 = Utf8               Deprecated</span><br><span class="line">  #15 = Utf8               RuntimeVisibleAnnotations</span><br><span class="line">  #16 = Utf8               Ljava/lang/Deprecated;</span><br><span class="line">  #17 = Utf8               SourceFile</span><br><span class="line">  #18 = Utf8               HelloWorld.java</span><br><span class="line">  #19 = NameAndType        #9:#10         // &quot;&lt;init&gt;&quot;:()V</span><br><span class="line">  #20 = Utf8               Hello</span><br><span class="line">  #21 = NameAndType        #7:#8          // str:Ljava/lang/String;</span><br><span class="line">  #22 = Utf8               HelloWorld</span><br><span class="line">  #23 = Utf8               java/lang/Object</span><br><span class="line">  #24 = Utf8               java/io/Serializable</span><br></pre></td></tr></table></figure></p>
+<p>方法名<code>testMethod</code>, 字段名<code>str</code> 等都被编译成了utf8属性，也就是字符串常量<br>方法签名变成了<code>()V</code>, 左边代表参数类型，右边代表返回值，V就是void, J代表Long(L已经被数组用掉了)，其他参考jvm8规范<br>其中还有别的信息，比如在源码里没有体现的attributes名称，例如 <code>LineNumberTable</code>, <code>Code</code></p>
+<h2 id="属性表-Attributes"><a href="#属性表-Attributes" class="headerlink" title="属性表(Attributes)"></a>属性表(Attributes)</h2><p>属性表是存储信息量最大的一块结构， 里面包含了你的方法编译后生成的<code>字节指令(Code)</code>, <code>注解信息</code>, <code>异常表(Exceptions)</code>, <code>栈映射表(StackMapTable)</code>等，还有很多调试信息,比如<code>LineNumberTable</code>就是源码行号表</p>
+<p>没错，你们框架常用的注解信息，就是存在<code>属性表</code>里，上面的field_info和method_info都包含属性信息，所以你可以对field和method进行注解</p>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本节主要介绍了class文件的历史，设计和结构， 这些是jvm平台无关性的基石，众所周知的java玩再深，就是玩字节码诡计，class文件就是字节码诡计的基石<br>在<code>运行时，编译时，类装载时</code>去动态加功能, 都是字节码诡计的杰作。常用的<code>AspectJ</code>框架就是如此。</p>
+<p>了解class文件的结构对后续的jvm学习有很大帮助，但是不可避免的又比较枯燥，笔者推荐是自己写个解析器去按照规范解析下, 纸上得来终觉浅，<code>learning by inventing</code>的路子是比较好的。</p>
+<p>最后，如果你不知道怎么解析，参考<a href="https://github.com/sound2gd/java-simple-class-reader" target="_blank" rel="noopener">java-simple-class-reader</a></p>
 
         
         </div>
@@ -359,19 +340,10 @@ var _hmt = _hmt || [];
         
 <nav id="article-nav">
     
-        <a href="/2018/09/26/JVM拾遗-1-万米高空看JVM/" id="article-nav-newer" class="article-nav-link-wrap">
-            <strong class="article-nav-caption">上一篇</strong>
-            <div class="article-nav-title">
-                
-                    JVM拾遗(1): 万米高空看JVM
-                
-            </div>
-        </a>
     
-    
-        <a href="/2018/07/24/Java-NIO分析-11-零拷贝技术/" id="article-nav-older" class="article-nav-link-wrap">
+        <a href="/2018/09/26/JVM拾遗-1-万米高空看JVM/" id="article-nav-older" class="article-nav-link-wrap">
             <strong class="article-nav-caption">下一篇</strong>
-            <div class="article-nav-title">Java NIO分析(11): 零拷贝技术以及NIO的支持</div>
+            <div class="article-nav-title">JVM拾遗(1): 万米高空看JVM</div>
         </a>
     
 </nav>
