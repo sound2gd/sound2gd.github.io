@@ -14,7 +14,7 @@
 <meta property="og:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2019-02-12T13:47:28.356Z">
+<meta property="og:updated_time" content="2019-02-12T13:58:26.739Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="JVM拾遗(3): 类装载机制">
 <meta name="twitter:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
@@ -273,7 +273,12 @@ var _hmt = _hmt || [];
 </ol>
 <p>所以无论哪个ClassLoader加载<code>java.lang.Object</code>, 得到的都是<code>BootstrapClassLoader</code>加载出来的.</p>
 <p>用户如果自定义<code>ClassLoader</code>, 继承的都是<code>java.lang.ClassLoader</code>,<br>据说最初ClassLoader设计出来是为了满足JavaApplet的需求, 由于笔者没有类似经验，就留给读者自己研究了.</p>
-<h2 id="1-3-自定义ClassLoader"><a href="#1-3-自定义ClassLoader" class="headerlink" title="1.3 自定义ClassLoader"></a>1.3 自定义ClassLoader</h2><p>自定义ClassLoader只需要继承<code>java.lang.ClassLoader</code>并且重写<code>findClass</code>方法就行了, 后面还会讲.</p>
+<h4 id="违背双亲委派模型"><a href="#违背双亲委派模型" class="headerlink" title="违背双亲委派模型"></a>违背双亲委派模型</h4><ol>
+<li>双亲委派模型自JDK1.2以后才出现，而<code>java.lang.ClassLoader</code>在1.0就已经出现，所以JDK不得不兼容新加了一个findClass()方法, 1.2以后一定不推荐直接写loadClass方法, 而是推荐用findClass,这样可以保证新写出来的类加载器是符合双亲委派机制的</li>
+<li>由于子类加载器会先将类交给父类加载器加载，解决了基础类的统一问题。如果基础类要调用用户类的代码，就无法作为。JDK为了满足这个需求(如在JNDI中)，引入了Thread Context ClassLoader, 这个类加载器可以通过<code>setContextClassLoader</code>进行设置, JDBC用这个类加载器去加载SPI代码, 实际上违背了双亲委派机制.</li>
+<li>OSGi模块化，导致用户自定义的类加载器是网状结构</li>
+</ol>
+<h2 id="1-3-自定义ClassLoader"><a href="#1-3-自定义ClassLoader" class="headerlink" title="1.3 自定义ClassLoader"></a>1.3 自定义ClassLoader</h2><p>自定义ClassLoader只需要继承<code>java.lang.ClassLoader</code>并且重写<code>findClass或者loadClass</code>方法就行了, 后面还会讲.</p>
 <p><strong>一个类由类名和类加载器唯一标识</strong>, 每个类加载器都有自己的独立的命名空间.</p>
 <p>及时两个类来自同一个class文件，被同一个JVM装载，只要加载它们的ClassLoader不一样，则这两个类不相等， 可以在同一个JVM里共存.</p>
 <h1 id="2-类装载过程"><a href="#2-类装载过程" class="headerlink" title="2. 类装载过程"></a>2. 类装载过程</h1><p>根据jvm8规范,类被类装载器装载到虚拟机内存，到卸载出内存，中间要经历以下步骤:</p>
