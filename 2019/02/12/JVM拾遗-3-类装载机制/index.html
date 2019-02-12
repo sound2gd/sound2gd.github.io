@@ -3,20 +3,22 @@
 <head>
     <meta charset="utf-8">
     
-    <title>luminus整合shadow-cljs打包 | Sound2gd的博客</title>
+    <title>JVM拾遗(3): 类装载机制 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
-<meta name="keywords" content="clojure">
+    <meta name="description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
+<meta name="keywords" content="JAVA JVM">
 <meta property="og:type" content="article">
-<meta property="og:title" content="luminus整合shadow-cljs打包">
-<meta property="og:url" content="http://sound2gd.wang/2018/03/21/luminus整合shadow-cljs打包/index.html">
+<meta property="og:title" content="JVM拾遗(3): 类装载机制">
+<meta property="og:url" content="http://sound2gd.wang/2019/02/12/JVM拾遗-3-类装载机制/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
+<meta property="og:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:updated_time" content="2018-03-21T15:23:00.000Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2019-02-12T13:47:28.356Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="luminus整合shadow-cljs打包">
-<meta name="twitter:description" content="shadow-cljs是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:  支持直接引用npm依赖, 以前还需要使用cljsjs转一次，不仅麻烦而且还是过时的 和webpack类似的代码分割, 依赖  当然，cljs+css代码重载是最基本的，而且构建速度也足够快">
+<meta name="twitter:title" content="JVM拾遗(3): 类装载机制">
+<meta name="twitter:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -196,7 +198,7 @@ var _hmt = _hmt || [];
 </aside>
 
             
-            <section id="main"><article id="post-luminus整合shadow-cljs打包" class="article article-type-post" itemscope itemprop="blogPost">
+            <section id="main"><article id="post-JVM拾遗-3-类装载机制" class="article article-type-post" itemscope itemprop="blogPost">
     <div class="article-inner">
         
         
@@ -204,7 +206,7 @@ var _hmt = _hmt || [];
                 
     
         <h1 class="article-title" itemprop="name">
-            luminus整合shadow-cljs打包
+            JVM拾遗(3): 类装载机制
         </h1>
     
 
@@ -213,8 +215,8 @@ var _hmt = _hmt || [];
                         
     <div class="article-date">
         <i class="fa fa-calendar"></i>
-        <a href="/2018/03/21/luminus整合shadow-cljs打包/">
-            <time datetime="2018-03-21T14:51:59.000Z" itemprop="datePublished">2018-03-21</time>
+        <a href="/2019/02/12/JVM拾遗-3-类装载机制/">
+            <time datetime="2019-02-12T09:39:41.000Z" itemprop="datePublished">2019-02-12</time>
         </a>
     </div>
 
@@ -222,13 +224,13 @@ var _hmt = _hmt || [];
                         
     <div class="article-category">
     	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/clojure/">clojure</a>
+        <a class="article-category-link" href="/categories/JVM/">JVM</a>
     </div>
 
                         
     <div class="article-tag">
         <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/clojure/">clojure</a>
+        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
     </div>
 
                     </div>
@@ -239,27 +241,82 @@ var _hmt = _hmt || [];
         <div class="article-entry" itemprop="articleBody">
         
             
-            <p><a href="https://github.com/thheller/shadow-cljs" target="_blank" rel="noopener">shadow-cljs</a>是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:</p>
+            <p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?</p>
+<p><strong>简言之: JVM会读取<code>.class</code>文件并加载和初始化到方法区</strong>, 之后才能被后续程序使用.<br>同时该过程还需要满足一些要求:</p>
+<ul>
+<li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法<ul>
+<li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换</li>
+<li>class文件里的各个符号引用要合法</li>
+</ul>
+</li>
+<li>允许运行时添加功能, 如各种分析工具包(arthas)等</li>
+</ul>
+<p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。</p>
+<a id="more"></a>
+<h1 id="1-类装载器-ClassLoader"><a href="#1-类装载器-ClassLoader" class="headerlink" title="1. 类装载器(ClassLoader)"></a>1. 类装载器(ClassLoader)</h1><h2 id="1-1-加载-Load"><a href="#1-1-加载-Load" class="headerlink" title="1.1 加载(Load)"></a>1.1 加载(Load)</h2><blockquote>
+<p>Loading is the process of finding the binary representation of a class or interface type with a particular name and creating a class or interface from that binary representation</p>
+</blockquote>
+<p>这是一段jvm8规范, 表示<code>装载</code>的过程就是<strong>通过一个特定的名字(类全名)来找到并获取描述此类的二进制表示的过程</strong>, 装载器(ClassLoader)用来完成装载过程.</p>
+<p>虚拟机规范并没有规定从哪里装载，所以可以从<code>网络上</code>, <code>zip包里</code>, <code>class文件里</code>等各个地方装载class文件.</p>
+<h2 id="1-2-双亲委派模型"><a href="#1-2-双亲委派模型" class="headerlink" title="1.2 双亲委派模型"></a>1.2 双亲委派模型</h2><p>JVM划分了3个层次的<code>ClassLoader</code>, 分别是:</p>
 <ol>
-<li>支持直接引用npm依赖, 以前还需要使用<code>cljsjs</code>转一次，不仅麻烦而且还是过时的</li>
-<li>和webpack类似的代码分割, 依赖</li>
+<li><code>启动类加载器BootstrapClassLoader</code>: 加载JDK提供的各个类，也就是rt.jar里的各个类, 启动类加载器无法被Java程序直接使用</li>
+<li><code>扩展类加载器ExtensionClassLoader</code>: 加载<code>${JavaHome}/lib/ext</code>下的类库, 可以被开发者使用</li>
+<li><code>应用类加载器ApplicationClassLoader</code>: 这个是开发者用的最多的, 它复杂加载<code>ClassPath</code>上指定的类库, 如果应用程序没有指定类加载器，默认就是用这个类加载器加载的。</li>
 </ol>
-<p>当然，<strong>cljs+css代码重载</strong>是最基本的，而且构建速度也足够快<br><a id="more"></a></p>
-<p>基于这些特点，打算采用<code>shadow-cljs</code>来编译cljs<br>想法是好的，实际运行的发现现实总是骨感的…</p>
-<h2 id="1-安装shadow-cljs"><a href="#1-安装shadow-cljs" class="headerlink" title="1. 安装shadow-cljs"></a>1. 安装shadow-cljs</h2><p>我先创建了一个<code>luminus</code>的应用，然后按照shadow-cljs官网所说，直接安装跑起来</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">lein new luminus shadow-gen</span><br><span class="line"><span class="built_in">cd</span> shadow-gen</span><br><span class="line">yarn add shadow-cljs</span><br><span class="line">shadow-cljs init</span><br></pre></td></tr></table></figure>
-<h2 id="2-shadow-cljs打包配置"><a href="#2-shadow-cljs打包配置" class="headerlink" title="2. shadow-cljs打包配置"></a>2. shadow-cljs打包配置</h2><p>然后我创建一个Build配置</p>
-<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">;; shadow-cljs configuration</span></span><br><span class="line">&#123;<span class="symbol">:source-paths</span></span><br><span class="line"> [<span class="string">"src/cljs"</span> <span class="string">"env/dev/cljs/"</span>]</span><br><span class="line"> <span class="symbol">:dependencies</span></span><br><span class="line"> [[org.clojure/clojurescript <span class="string">"1.9.946"</span>]</span><br><span class="line">  [re-frame <span class="string">"0.10.5"</span>]</span><br><span class="line">  [reagent <span class="string">"0.7.0"</span>]</span><br><span class="line">  [secretary <span class="string">"1.2.3"</span>]</span><br><span class="line">  [cljs-ajax <span class="string">"0.7.3"</span>]</span><br><span class="line">  [day8.re-frame/re-frame-10x <span class="string">"0.2.0"</span>]]</span><br><span class="line"> <span class="symbol">:verbose</span> <span class="literal">true</span></span><br><span class="line"> <span class="symbol">:builds</span></span><br><span class="line"> &#123;<span class="symbol">:app</span> &#123;<span class="symbol">:target</span> <span class="symbol">:browser</span></span><br><span class="line">        <span class="symbol">:output-dir</span> <span class="string">"target/cljsbuild/public/js"</span></span><br><span class="line">        <span class="symbol">:asset-path</span> <span class="string">"/js"</span></span><br><span class="line">        <span class="symbol">:dev</span></span><br><span class="line">        &#123;<span class="symbol">:compiler-options</span> &#123;<span class="symbol">:closure-warnings</span> &#123;<span class="symbol">:global-this</span> <span class="symbol">:off</span>&#125;</span><br><span class="line">                            <span class="symbol">:closure-defines</span> &#123;<span class="string">"re_frame.trace.trace_enabled_QMARK_"</span> <span class="literal">true</span>&#125;</span><br><span class="line">                            <span class="symbol">:source-map</span> <span class="literal">true</span></span><br><span class="line">                            <span class="symbol">:optimizations</span> <span class="symbol">:none</span></span><br><span class="line">                            <span class="symbol">:pretty-print</span> <span class="literal">true</span>&#125;&#125;</span><br><span class="line">        <span class="symbol">:release</span></span><br><span class="line">        &#123;<span class="symbol">:compiler-options</span> &#123;<span class="symbol">:optimizations</span> <span class="symbol">:advanced</span></span><br><span class="line">                            <span class="symbol">:pretty-print</span> <span class="literal">false</span></span><br><span class="line">                            <span class="symbol">:closure-warnings</span></span><br><span class="line">                           &#123;<span class="symbol">:externs-validation</span> <span class="symbol">:off</span> <span class="symbol">:non-standard-jsdoc</span> <span class="symbol">:off</span>&#125;&#125;&#125;</span><br><span class="line">        <span class="symbol">:modules</span> &#123;<span class="symbol">:app</span> &#123;<span class="symbol">:entries</span> [shadow-gen.app]&#125;&#125;</span><br><span class="line">        <span class="symbol">:devtools</span> &#123;<span class="symbol">:after-load</span> shadow-gen.core/mount-components</span><br><span class="line">                   <span class="symbol">:preloads</span> [day8.re-frame-10x.preload]</span><br><span class="line">                   &#125;</span><br><span class="line">        &#125;&#125;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
-<p>开了<code>day8.re-frame-10x.preload</code>半天页面一直崩，问了下作者thheller发现reframe的dev工具有bug,现在还无解…<br>然后<code>lein repl</code>,start之后，访问一下<code>localhost:3000</code>, 一开始是好的，后来改下代码hmr之后发现果然崩了。。</p>
-<p>打开app.cljs一看，由于<code>figwheel-no-load</code>元数据, figwheel每次重载都会避开app.cljs,</p>
-<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">(<span class="name"><span class="builtin-name">ns</span></span> ^<span class="symbol">:figwheel-no-load</span> shadow-gen.app</span><br><span class="line">  (<span class="symbol">:require</span> [shadow-gen.core <span class="symbol">:as</span> core]</span><br><span class="line">            [devtools.core <span class="symbol">:as</span> devtools]))</span><br><span class="line"></span><br><span class="line"><span class="comment">;; shadow-gen自带了devtool不需要这些了</span></span><br><span class="line"><span class="comment">;; (enable-console-print!)</span></span><br><span class="line"><span class="comment">;; (devtools/install!)</span></span><br><span class="line"></span><br><span class="line">(<span class="name">core/init!</span>)</span><br></pre></td></tr></table></figure>
-<p>shadow-gen不会skip,<strong>每次都会reload整个ns</strong>,然后init!的时候会重复创建goog.History对象，就崩了，<br>跟作者提了下，作者当天就把这个功能加上去了。。。</p>
-<p>后来请教了下赵宇少侠，发现把core.cljs里的init!导出，然后在html引的时候<strong>直接调用core里的init</strong>也是一种很好的解决方案,<br>然后把entry改成core.cljs,每次重载的时候调用edn里配置的<code>:after-load</code>去mount就好了<br><figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;% script "/js/app.js" %&#125;</span><br><span class="line"><span class="tag">&lt;<span class="name">script</span> <span class="attr">type</span>=<span class="string">"text/javascript"</span>&gt;</span><span class="undefined"></span></span><br><span class="line"><span class="undefined"> var context = "&#123;&#123;servlet-context&#125;&#125;";</span></span><br><span class="line"><span class="undefined"> var csrfToken = "&#123;&#123;csrf-token&#125;&#125;";</span></span><br><span class="line"><span class="undefined"> shadow_gen.core.init_BANG_(); // 加了这行</span></span><br><span class="line"><span class="undefined"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure></p>
-<h2 id="3-整合leiningen"><a href="#3-整合leiningen" class="headerlink" title="3. 整合leiningen"></a>3. 整合leiningen</h2><p>这样打包基本就ok了，怎么和lein这个呢，我的代码里既有java代码，又有clj和cljs代码<br>一开始我是先编译cljs的</p>
-<pre><code>shadow-cljs release app
-</code></pre><p>然后发现leiningen在编译的时候，直接会清空target目录…<br>翻了下leiningen文档，发现在pretask里可以指定任务顺序，我的是先编译java,然后编译clj,最后使用<code>shadow.cljs.devtools.cli</code>编译cljs<br>lein里面javac可以编译java,compile编译clj, 去掉原来的<code>:cljsbuild</code>最后配置是这样</p>
-<figure class="highlight clojure"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="symbol">:uberjar</span> &#123;<span class="symbol">:omit-source</span> <span class="literal">true</span></span><br><span class="line">             <span class="symbol">:main</span> ^<span class="symbol">:skip-aot</span> shadow-gen.core</span><br><span class="line">             <span class="symbol">:prep-tasks</span> [<span class="string">"javac"</span> <span class="string">"compile"</span> [<span class="string">"run"</span> <span class="string">"-m"</span> <span class="string">"shadow.cljs.devtools.cli"</span> <span class="string">"release"</span> <span class="string">"app"</span>]]</span><br><span class="line">             <span class="symbol">:aot</span> <span class="symbol">:all</span></span><br><span class="line">             <span class="symbol">:uberjar-name</span> <span class="string">"shadow-gen.jar"</span></span><br><span class="line">             <span class="symbol">:source-paths</span> [<span class="string">"env/prod/clj"</span>]</span><br><span class="line">             <span class="symbol">:resource-paths</span> [<span class="string">"env/prod/resources"</span>]&#125;&#125;</span><br></pre></td></tr></table></figure>
-<p>这样就大功告成了! 成功把shadow-cljs和leiningen整合，完美java,clj,cljs混编!</p>
+<p>类加载器之间是有父子关系的，上面的类加载器的关系是:</p>
+<p><img src="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>这种层次关系称为<code>双亲委派模型</code>，如果一个ClassLoader收到了装载类的请求,它的工作过程是:</p>
+<ol>
+<li>先交给父ClassLoader加载, 如果父在加载器加载完成，直接返回class</li>
+<li>如果父ClassLoader不能加载，则自己负责加载</li>
+</ol>
+<p>所以无论哪个ClassLoader加载<code>java.lang.Object</code>, 得到的都是<code>BootstrapClassLoader</code>加载出来的.</p>
+<p>用户如果自定义<code>ClassLoader</code>, 继承的都是<code>java.lang.ClassLoader</code>,<br>据说最初ClassLoader设计出来是为了满足JavaApplet的需求, 由于笔者没有类似经验，就留给读者自己研究了.</p>
+<h2 id="1-3-自定义ClassLoader"><a href="#1-3-自定义ClassLoader" class="headerlink" title="1.3 自定义ClassLoader"></a>1.3 自定义ClassLoader</h2><p>自定义ClassLoader只需要继承<code>java.lang.ClassLoader</code>并且重写<code>findClass</code>方法就行了, 后面还会讲.</p>
+<p><strong>一个类由类名和类加载器唯一标识</strong>, 每个类加载器都有自己的独立的命名空间.</p>
+<p>及时两个类来自同一个class文件，被同一个JVM装载，只要加载它们的ClassLoader不一样，则这两个类不相等， 可以在同一个JVM里共存.</p>
+<h1 id="2-类装载过程"><a href="#2-类装载过程" class="headerlink" title="2. 类装载过程"></a>2. 类装载过程</h1><p>根据jvm8规范,类被类装载器装载到虚拟机内存，到卸载出内存，中间要经历以下步骤:</p>
+<ol>
+<li>创建和加载(Creation And Loading)</li>
+<li>链接(Linking)</li>
+<li>初始化(Initialization)</li>
+<li>绑定本地方法实现(Binding Native Method Implementations)</li>
+</ol>
+<h2 id="2-1-创建和加载"><a href="#2-1-创建和加载" class="headerlink" title="2.1 创建和加载"></a>2.1 创建和加载</h2><p>这个阶段，虚拟机要完成3个事情:</p>
+<ol>
+<li>通过一个类的全限定名(Full Qualified Name)来获取定义此类的二进制流</li>
+<li>将这个字节流所代表的静态存储结构转化为方法区的运行时数据结构</li>
+<li>在内存中生成一个代表这个类的<code>java.lang.Class</code>对象,作为方法区这个类的各种数据的访问入口</li>
+</ol>
+<p>以上规则不对数组类适用, 因为数组类本身不通过类加载器创建，而是通过JVM直接创建.数组类满足以下规则:</p>
+<ul>
+<li>如果数组的元素类型(Component Type, 也就是数组去掉一个维度的类型)是引用类型，递归加载这个类型,并且数组将在加载这个元素类型的类名称空间上被标识</li>
+<li>如果数据的元素类型不是引用类型， 如int[], JVM会交给BootstrapClassLoader</li>
+<li>数组类的可见性和它的元素类型一致</li>
+</ul>
+<h2 id="2-2-链接"><a href="#2-2-链接" class="headerlink" title="2.2 链接"></a>2.2 链接</h2><p>链接阶段又包括<code>验证Verification</code>,<code>准备Preparation</code>, <code>解析Resolution</code>, <code>访问控制Access Control</code>, <code>覆盖Overriding</code>等步骤</p>
+<h3 id="2-2-1-验证"><a href="#2-2-1-验证" class="headerlink" title="2.2.1 验证"></a>2.2.1 验证</h3><p>这一阶段的目的是确保class文件的字节流中包含的信息符合JVM的规范，并且不会危害JVM自身的安全.</p>
+<p>一般通过javac编译出来的class文件，都不会有任何问题，但是class文件可以通过各种途径生成, 比如从网络里读取，裸写二进制到文件等</p>
+<p>验证阶段可能导致额外的类和接口被装载，验证的过程需要满足</p>
+<ol>
+<li>class文件格式验证: 魔数的正确性(0xCAFEBABE), 主次版本号满足要求,常量约束等</li>
+<li>元数据验证: 对字节码描述的信息进行语义分析，比如这个类是否有父类，父类是否存在，是否继承了不该被继承的类(final**, 是否实现了要求实现的抽象方法等</li>
+<li>字节码验证: 保证指令集是JVM规范里的，保证指令集的语义合法, 类型转换是有效的等</li>
+<li>符号引用验证: 符号引用描述的类全限定名能不能找到对应的类, 引用的字段能不能访问等等</li>
+</ol>
+<p>上一节讲到class文件结构的属性表里有一个<code>StackMapTable</code>属性, 描述了方法体的所有基本块，只要检查这些状态的合法性就能判断字节码是否正确,能加速JVM的验证过程.<br>在1.6的HotSopt里能通过<code>-XX:UseSplitVerifier</code>来关闭这个优化</p>
+<p>验证失败会抛出VerifyError, 终止类加载过程, 虚拟机退出</p>
+<h3 id="2-2-2-准备"><a href="#2-2-2-准备" class="headerlink" title="2.2.2 准备"></a>2.2.2 准备</h3><p>准备阶段是正式为类变量分配内存，并且设置类变量的初始值. </p>
+<p><strong>分配的内存在方法区，也就是说类变量都在方法区里存着</strong></p>
+<h3 id="2-2-3-解析"><a href="#2-2-3-解析" class="headerlink" title="2.2.3 解析"></a>2.2.3 解析</h3><p>解析阶段JVM会将常量池内的符号引用替换为直接引用.直接引用一般就是一个直接指向目标的指针，相对偏移量或者间接定位到目标的句柄.</p>
+<p>对同一个符号引用的解析，JVM会进行缓存，避免解析动作重复进行.除了<code>invokedynamic</code>指令，这个指令本身就是动态解析，只有程序运行到这的时候，解析动作才能进行.</p>
+<p>解析动作主要针对类或接口，字段，类方法，接口方法，方法类型，句柄，调用点这7类符号引用。</p>
+<h3 id="2-2-4-初始化"><a href="#2-2-4-初始化" class="headerlink" title="2.2.4 初始化"></a>2.2.4 初始化</h3><p>类的初始化是最后一步，虚拟机规范里的访问控制和覆盖在前面几步已经交叉进行了.</p>
+<p>到了初始化阶段才真正开始执行Java程序代码, 会执行类的初始化(不是调用类的构造函数)</p>
+<p><code>&lt;cinit&gt;</code>: 类初始化，会搜集所有的static代码块合并并执行, 执行本类的<code>&lt;cinit&gt;</code>之前会先执行父类的. 如果类没有static代码，编译器可以不生成<code>&lt;cinit&gt;</code>, cinit是线程安全的.一个类型只会初始化一次.</p>
+<h2 id="2-3-绑定本地方法实现"><a href="#2-3-绑定本地方法实现" class="headerlink" title="2.3 绑定本地方法实现"></a>2.3 绑定本地方法实现</h2><p>这个过程是用来绑定c这样的native实现的, 虚拟机也没规定说要到最后再绑定.</p>
+<h1 id="3-小结"><a href="#3-小结" class="headerlink" title="3. 小结"></a>3. 小结</h1><p>本次主要讲了JVM如何装载一个类, JVM是通过<code>Classloader</code>来装载类, <code>ClassLoader</code>通过<code>双亲委派机制</code>工作，并且每次装载都会经历<code>加载</code>,<code>链接</code>,<code>解析</code>这样的过程, 加载阶段会将二进制类表示在方法区, 链接阶段会验证class的合法性，并且初始化类变量, 但是不赋值(如int初始化为0).初始化阶段会触发一系列的类变量初始化工作和静态代码块执行工作, 这个阶段才真正开始执行java程序代码.</p>
 
         
         </div>
@@ -332,19 +389,10 @@ var _hmt = _hmt || [];
         
 <nav id="article-nav">
     
-        <a href="/2018/06/14/Java-NIO分析-1-Unix网络模型/" id="article-nav-newer" class="article-nav-link-wrap">
-            <strong class="article-nav-caption">上一篇</strong>
-            <div class="article-nav-title">
-                
-                    Java NIO分析(1): Unix网络模型
-                
-            </div>
-        </a>
     
-    
-        <a href="/2017/12/15/使用clj1-9快速启动repl/" id="article-nav-older" class="article-nav-link-wrap">
+        <a href="/2018/10/25/JVM拾遗-2-平台无关性基石之Class解析/" id="article-nav-older" class="article-nav-link-wrap">
             <strong class="article-nav-caption">下一篇</strong>
-            <div class="article-nav-title">使用clj1.9快速启动clojure的repl</div>
+            <div class="article-nav-title">JVM拾遗(2): 平台无关性基石之Class解析</div>
         </a>
     
 </nav>
