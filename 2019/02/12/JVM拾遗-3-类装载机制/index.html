@@ -14,7 +14,7 @@
 <meta property="og:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2019-02-12T13:58:26.739Z">
+<meta property="og:updated_time" content="2019-02-12T14:01:10.614Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="JVM拾遗(3): 类装载机制">
 <meta name="twitter:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
@@ -322,6 +322,7 @@ var _hmt = _hmt || [];
 <p><code>&lt;cinit&gt;</code>: 类初始化，会搜集所有的static代码块合并并执行, 执行本类的<code>&lt;cinit&gt;</code>之前会先执行父类的. 如果类没有static代码，编译器可以不生成<code>&lt;cinit&gt;</code>, cinit是线程安全的.一个类型只会初始化一次.</p>
 <h2 id="2-3-绑定本地方法实现"><a href="#2-3-绑定本地方法实现" class="headerlink" title="2.3 绑定本地方法实现"></a>2.3 绑定本地方法实现</h2><p>这个过程是用来绑定c这样的native实现的, 虚拟机也没规定说要到最后再绑定.</p>
 <h1 id="3-小结"><a href="#3-小结" class="headerlink" title="3. 小结"></a>3. 小结</h1><p>本次主要讲了JVM如何装载一个类, JVM是通过<code>Classloader</code>来装载类, <code>ClassLoader</code>通过<code>双亲委派机制</code>工作，并且每次装载都会经历<code>加载</code>,<code>链接</code>,<code>解析</code>这样的过程, 加载阶段会将二进制类表示在方法区, 链接阶段会验证class的合法性，并且初始化类变量, 但是不赋值(如int初始化为0).初始化阶段会触发一系列的类变量初始化工作和静态代码块执行工作, 这个阶段才真正开始执行java程序代码.</p>
+<p>回过头看开头提出的需求，Java的动态性, 如热部署，动态编译JSP, 运行时增强类功能等, 通过类加载器动态加载类都可以实现:)</p>
 
         
         </div>
