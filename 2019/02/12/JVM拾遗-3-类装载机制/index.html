@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="Sound2gd的博客">
 <meta property="og:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2019-02-12T14:01:10.614Z">
+<meta property="og:image" content="http://img.sound2gd.wang/2019/02/12/20190212230804.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2019-02-12T15:08:15.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="JVM拾遗(3): 类装载机制">
 <meta name="twitter:description" content="上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件? 简言之: JVM会读取.class文件并加载和初始化到方法区, 之后才能被后续程序使用.同时该过程还需要满足一些要求:  加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法 java的rt.jar里定义的类,如java.lang.Object, 不能被替换 class文件里的各个符号引">
-<meta name="twitter:image" content="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2019/02/12/20190212230804.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
     
 
     
@@ -265,7 +265,7 @@ var _hmt = _hmt || [];
 <li><code>应用类加载器ApplicationClassLoader</code>: 这个是开发者用的最多的, 它复杂加载<code>ClassPath</code>上指定的类库, 如果应用程序没有指定类加载器，默认就是用这个类加载器加载的。</li>
 </ol>
 <p>类加载器之间是有父子关系的，上面的类加载器的关系是:</p>
-<p><img src="http://img.sound2gd.wang/2019/02/12/20190212200226.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p><img src="http://img.sound2gd.wang/2019/02/12/20190212230804.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
 <p>这种层次关系称为<code>双亲委派模型</code>，如果一个ClassLoader收到了装载类的请求,它的工作过程是:</p>
 <ol>
 <li>先交给父ClassLoader加载, 如果父在加载器加载完成，直接返回class</li>
