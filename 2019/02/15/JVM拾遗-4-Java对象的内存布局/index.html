@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <meta charset="utf-8">
+    
+    <title>JVM拾遗(4): Java对象的内存布局 | Sound2gd的博客</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="上一节JVM拾遗(3): 类装载机制讲了JVM如何将类装载到虚拟机以供后续使用那么JVM是如何创建类的实例呢?该对象是如何分配内存的? 1. 实例化1.1 创建对象的方式Java对象的创建, 有多种方式，最简单就是new XXClass, 还可以通过反射，xx.clone(),反序列化以及黑科技Unsafe.allocateInstance等方法. new和反射创建对象实例的时候，会初始化实例字段">
+<meta name="keywords" content="JAVA JVM">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM拾遗(4): Java对象的内存布局">
+<meta property="og:url" content="http://sound2gd.wang/2019/02/15/JVM拾遗-4-Java对象的内存布局/index.html">
+<meta property="og:site_name" content="Sound2gd的博客">
+<meta property="og:description" content="上一节JVM拾遗(3): 类装载机制讲了JVM如何将类装载到虚拟机以供后续使用那么JVM是如何创建类的实例呢?该对象是如何分配内存的? 1. 实例化1.1 创建对象的方式Java对象的创建, 有多种方式，最简单就是new XXClass, 还可以通过反射，xx.clone(),反序列化以及黑科技Unsafe.allocateInstance等方法. new和反射创建对象实例的时候，会初始化实例字段">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="http://img.sound2gd.wang/2019/02/15/20190215233745.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<meta property="og:updated_time" content="2019-02-15T15:47:10.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="JVM拾遗(4): Java对象的内存布局">
+<meta name="twitter:description" content="上一节JVM拾遗(3): 类装载机制讲了JVM如何将类装载到虚拟机以供后续使用那么JVM是如何创建类的实例呢?该对象是如何分配内存的? 1. 实例化1.1 创建对象的方式Java对象的创建, 有多种方式，最简单就是new XXClass, 还可以通过反射，xx.clone(),反序列化以及黑科技Unsafe.allocateInstance等方法. new和反射创建对象实例的时候，会初始化实例字段">
+<meta name="twitter:image" content="http://img.sound2gd.wang/2019/02/15/20190215233745.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+    
+
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+        <script>
+var _hmt = _hmt || [];
+(function() {
+    var hm = document.createElement("script");
+    hm.src = "//hm.baidu.com/hm.js?f426069bc0171b52f8d8940dda335558";
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(hm, s);
+})();
+</script>
+
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">Sound2gd的博客</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">主页</a>
+                
+                    <a class="main-nav-link" href="/archives">归档</a>
+                
+                    <a class="main-nav-link" href="/categories">分类</a>
+                
+                    <a class="main-nav-link" href="/tags">标签</a>
+                
+                    <a class="main-nav-link" href="/about">关于</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/avatar.jpeg" />
+                            <i class="fa fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="想要查找什么..." />
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">主页</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">归档</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">分类</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">标签</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">关于</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="搜索" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/avatar.jpeg" />
+            <h2 id="name">Chris Wang</h2>
+            <h3 id="title">伪全栈极客,热爱技术</h3>
+            <span id="location"><i class="fa fa-map-marker"></i>中国, 杭州</span>
+            <a id="follow" target="_blank" href="https://github.com/sound2gd/">关注我</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                19
+                <span>文章</span>
+            </div>
+            <div class="article-info-block">
+                5
+                <span>标签</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/sound2gd/" target="_blank" title="github" class=tooltip>
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-JVM拾遗-4-Java对象的内存布局" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            JVM拾遗(4): Java对象的内存布局
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fa fa-calendar"></i>
+        <a href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/">
+            <time datetime="2019-02-15T06:56:24.000Z" itemprop="datePublished">2019-02-15</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fa fa-folder"></i>
+        <a class="article-category-link" href="/categories/JVM-JAVA/">JVM JAVA</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>上一节<a href="/2019/02/12/JVM拾遗-3-类装载机制/" title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>讲了JVM如何将类装载到虚拟机以供后续使用<br>那么JVM是如何创建类的实例呢?该对象是如何分配内存的?</p>
+<h1 id="1-实例化"><a href="#1-实例化" class="headerlink" title="1. 实例化"></a>1. 实例化</h1><h2 id="1-1-创建对象的方式"><a href="#1-1-创建对象的方式" class="headerlink" title="1.1 创建对象的方式"></a>1.1 创建对象的方式</h2><p>Java对象的创建, 有多种方式，最简单就是<code>new XXClass</code>, 还可以通过<code>反射</code>，<code>xx.clone()</code>,<code>反序列化</code>以及黑科技<code>Unsafe.allocateInstance</code>等方法.</p>
+<p><code>new</code>和反射创建对象实例的时候，会初始化实例字段.</p>
+<p>如果类没有构造器，会默认添加构造器，并且编译成<code>&lt;init&gt;</code>方法.<br>默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p>
+<a id="more"></a>
+<p>如下类:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestClass</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">test</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    TestClass t = <span class="keyword">new</span> TestClass();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>生成的字节码如下(用<code>javap -v TestClass</code>可以得到):</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">public TestClass();</span><br><span class="line">    descriptor: ()V</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=1, locals=1, args_size=1</span><br><span class="line">         0: aload_0</span><br><span class="line">         1: invokespecial <span class="comment">#1                  // Method java/lang/Object."&lt;init&gt;":()V</span></span><br><span class="line">         4: <span class="built_in">return</span></span><br><span class="line"></span><br><span class="line">public void <span class="built_in">test</span>();</span><br><span class="line">    descriptor: ()V</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=2, locals=2, args_size=1</span><br><span class="line">         0: new           <span class="comment">#2                  // class TestClass</span></span><br><span class="line">         3: dup</span><br><span class="line">         4: invokespecial <span class="comment">#3                  // Method "&lt;init&gt;":()V</span></span><br><span class="line">         7: astore_1</span><br><span class="line">         8: <span class="built_in">return</span></span><br></pre></td></tr></table></figure>
+<p>那两行<code>invokespecial</code>指令是用来调用类构造器或者类的私有方法的.</p>
+<p>可以看到，<code>TestClass</code>类添加了默认的构造器,生成了<code>&lt;init&gt;方法</code>，同时调用了<code>Object</code>类的<code>&lt;init&gt;</code>方法，也就是<code>java.lang.Object</code>类的构造方法.<br>也可以显式调用父类的构造器, 使用<code>super(a,b,c)</code>这样的形式即可</p>
+<h2 id="1-2-虚拟机如何处理new指令"><a href="#1-2-虚拟机如何处理new指令" class="headerlink" title="1.2 虚拟机如何处理new指令"></a>1.2 虚拟机如何处理new指令</h2><p><code>new</code>指令会实例化一个对象, JVM如何处理<code>new</code>指令生成具体的对象并不是规范的一部分，所以这里指的JVM实现指的是<code>Hotspot</code>的实现</p>
+<p>下面是<code>new</code>指令实例化对象的过程:</p>
+<ol>
+<li>JVM会判断对应的类是否被加载，链接，初始化, 判断的依据是根据符号引用找方法区是否有类的数据.如果没有需要进行类的加载过程</li>
+<li>为对象分配内存, 有2种方式<ul>
+<li>指针提升(bump pointer, 注意没翻译错), 如果<code>堆内存</code>是规整的, 那么只需要把指针移动一个对象大小的距离就完成了分配</li>
+<li>空闲列表(free list), 如果<code>堆内存</code>是不连续的，碎片很多, JVM会维护一个可用内存队列, 从中查出可用内存分配给对象.<br>具体使用哪种方式依据堆内存的情况而定，而堆内存的情况很大受到<code>gc</code>的影响，后面会细谈</li>
+</ul>
+</li>
+<li>初始化内存, JVM会将分配到的内存初始化为0值.</li>
+<li>设置对象的元数据信息到<code>对象头</code>, 例如对象的<code>hashcode</code>,<code>gc分带年龄</code>,<code>偏向锁状态</code>等信息</li>
+</ol>
+<p>一般来讲，<code>new</code>指令后面都会跟着<code>invokespecial</code>来执行<code>&lt;init&gt;</code>方法，也就是执行类构造器里的逻辑.</p>
+<h3 id="对象创建的并发安全问题"><a href="#对象创建的并发安全问题" class="headerlink" title="对象创建的并发安全问题"></a>对象创建的并发安全问题</h3><p>JVM处理对象创建的并发安全一般有2种方法:</p>
+<ol>
+<li><code>CAS</code>操作加上失败重试</li>
+<li>内存分配的动作按照线程划分在不同的内存空间区域进行，这些预先分配的内存仅属于该线程私有，也称为<code>本地线程分配缓冲(Thread Local Allocation Buffer, TLAB)</code>, 可以通过<code>-XX:UseTLAB</code>来设置</li>
+</ol>
+<h1 id="2-对象的内存布局"><a href="#2-对象的内存布局" class="headerlink" title="2. 对象的内存布局"></a>2. 对象的内存布局</h1><p>对象的内存布局也不是JVM规范的一部分，属于实现的细节，<code>Hotspot</code>将对象分成3部分,分别是:</p>
+<ol>
+<li>对象头(Object Header)</li>
+<li>实例数据(Instance Data)</li>
+<li>对齐填充(Padding)</li>
+</ol>
+<h2 id="2-1-Object-Header"><a href="#2-1-Object-Header" class="headerlink" title="2.1 Object Header"></a>2.1 Object Header</h2><p>对象头由<code>标记字段(Mark Word)</code>和<code>类型指针(Klass Pointer)</code>组成</p>
+<p><code>Mark Word</code>用于存储该对象的运行时数据, 包括:</p>
+<ul>
+<li>对象<code>hashcode</code>, <code>gc</code>分代年龄</li>
+<li>锁记录指针, 重量级锁指针</li>
+<li>偏向线程id, 偏向时间戳</li>
+</ul>
+<p>在64位的虚拟机上<code>标记字段</code>一般是8个字节，<code>类型指针</code>也是8个字节，总共就是16个字节.</p>
+<p>可以使用<code>-XX:UseCompressedOops</code>来开启压缩指针, 以减少对象的内存使用量, 默认是开启的.</p>
+<p>而<code>类型指针</code>指向的是对象的元数据信息, 也就是对象所属类的信息.</p>
+<h3 id="HotSpot实现"><a href="#HotSpot实现" class="headerlink" title="HotSpot实现"></a>HotSpot实现</h3><p><code>Hotspot</code>一般用<code>OOP-Klass</code>二分模型来实现, <code>OOP(Ordinary Object Pointer)</code>是普通对象指针，<code>Klass</code>用来描述具体的类型.</p>
+<p>以下是openjdk的实现:</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// hotspot/src/share/vm/oops/oop.hpp</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">oopDesc</span> &#123;</span></span><br><span class="line">  <span class="keyword">friend</span> <span class="class"><span class="keyword">class</span> <span class="title">VMStructs</span>;</span></span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="comment">// mark word真身</span></span><br><span class="line">  <span class="keyword">volatile</span> markOop  _mark;</span><br><span class="line">  <span class="comment">// 元数据指针</span></span><br><span class="line">  <span class="keyword">union</span> _metadata &#123;</span><br><span class="line">    Klass*      _klass;</span><br><span class="line">    narrowKlass _compressed_klass;</span><br><span class="line">  &#125; _metadata;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="function">markOop  <span class="title">mark</span><span class="params">()</span> <span class="keyword">const</span>         </span>&#123; <span class="keyword">return</span> _mark; &#125;</span><br><span class="line">  <span class="function">Klass* <span class="title">klass</span><span class="params">()</span> <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">narrowKlass* <span class="title">compressed_klass_addr</span><span class="params">()</span></span>;</span><br><span class="line">  </span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="comment">// field addresses in oop</span></span><br><span class="line">  <span class="function"><span class="keyword">void</span>*     <span class="title">field_base</span><span class="params">(<span class="keyword">int</span> offset)</span>        <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="function">jbyte*    <span class="title">byte_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>   <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jchar*    <span class="title">char_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>   <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jboolean* <span class="title">bool_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>   <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jint*     <span class="title">int_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>    <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jshort*   <span class="title">short_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>  <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jlong*    <span class="title">long_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>   <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jfloat*   <span class="title">float_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span>  <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">jdouble*  <span class="title">double_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span> <span class="keyword">const</span></span>;</span><br><span class="line">  <span class="function">Metadata** <span class="title">metadata_field_addr</span><span class="params">(<span class="keyword">int</span> offset)</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  ...省略非关键代码...</span><br></pre></td></tr></table></figure>
+<p>其中<code>OOP</code>的实现就是<code>instanceOopDesc</code>和<code>arrayOopDesc</code>,分别是普通对象实现和数组对象实现, 均继承自上面的<code>oopDesc</code>,<br>数组对象比普通对象多一个长度字段.<br><code>oopDesc</code>存放有<code>_mark</code>和<code>_metadata</code>, <code>_mark</code>就是标记字段(mark word), 而<code>_metadata</code>里就有一个指针指向<code>Klass</code>.</p>
+<p>限于篇幅，<code>markOop.hpp</code>的代码就不贴了，大致就是上面提到的信息。</p>
+<p>类型指针(上面<code>_meta</code>里<code>__klass</code>指针)指向的<code>Klass</code>信息, 即类在JVM的真身, 看看就好.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// hotspot/src/share/vm/oops/instanceKlass.hpp</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">InstanceKlass</span>:</span> <span class="keyword">public</span> Klass &#123;</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="comment">// See "The Java Virtual Machine Specification" section 2.16.2-5 for a detailed description</span></span><br><span class="line">  <span class="comment">// of the class loading &amp; initialization procedure, and the use of the states.</span></span><br><span class="line">  <span class="comment">// 类的加载状态, JVM规范里的各个阶段可能会穿插进行</span></span><br><span class="line">  <span class="keyword">enum</span> ClassState &#123;</span><br><span class="line">    allocated,                          <span class="comment">// allocated (but not yet linked)</span></span><br><span class="line">    loaded,                             <span class="comment">// loaded and inserted in class hierarchy (but not linked yet)</span></span><br><span class="line">    linked,                             <span class="comment">// successfully linked/verified (but not initialized yet)</span></span><br><span class="line">    being_initialized,                  <span class="comment">// currently running class initializer</span></span><br><span class="line">    fully_initialized,                  <span class="comment">// initialized (successfull final state)</span></span><br><span class="line">    initialization_error                <span class="comment">// error happened during initialization</span></span><br><span class="line">  &#125;;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// hotspot/src/share/vm/oops/klass.hpp</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Klass</span> :</span> <span class="keyword">public</span> Metadata &#123;</span><br><span class="line">  <span class="keyword">friend</span> <span class="class"><span class="keyword">class</span> <span class="title">VMStructs</span>;</span></span><br><span class="line"> <span class="keyword">protected</span>:</span><br><span class="line">  jint        _layout_helper;</span><br><span class="line">  juint       _super_check_offset;</span><br><span class="line">  Symbol*     _name;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Cache of last observed secondary supertype</span></span><br><span class="line">  Klass*      _secondary_super_cache;</span><br><span class="line">  <span class="comment">// Array of all secondary supertypes</span></span><br><span class="line">  Array&lt;Klass*&gt;* _secondary_supers;</span><br><span class="line">  <span class="comment">// Ordered list of all primary supertypes</span></span><br><span class="line">  Klass*      _primary_supers[_primary_super_limit];</span><br><span class="line">  <span class="comment">// java/lang/Class instance mirroring this class</span></span><br><span class="line">  oop       _java_mirror;</span><br><span class="line">  <span class="comment">// Superclass</span></span><br><span class="line">  Klass*      _super;</span><br><span class="line">  <span class="comment">// First subclass (NULL if none); _subklass-&gt;next_sibling() is next one</span></span><br><span class="line">  Klass*      _subklass;</span><br><span class="line">  <span class="comment">// Sibling link (or NULL); links all subklasses of a klass</span></span><br><span class="line">  Klass*      _next_sibling;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// All klasses loaded by a class loader are chained through these links</span></span><br><span class="line">  Klass*      _next_link;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// The VM's representation of the ClassLoader used to load this class.</span></span><br><span class="line">  <span class="comment">// Provide access the corresponding instance java.lang.ClassLoader.</span></span><br><span class="line">  ClassLoaderData* _class_loader_data;</span><br><span class="line"></span><br><span class="line">  jint        _modifier_flags;  <span class="comment">// Processed access flags, for use by Class.getModifiers.</span></span><br><span class="line">  AccessFlags _access_flags;    <span class="comment">// Access flags. The class/interface distinction is stored here.</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// Biased locking implementation and statistics</span></span><br><span class="line">  <span class="comment">// (the 64-bit chunk goes first, to avoid some fragmentation)</span></span><br><span class="line">  jlong    _last_biased_lock_bulk_revocation_time;</span><br><span class="line">  markOop  _prototype_header;   <span class="comment">// Used when biased locking is both enabled and disabled for this type</span></span><br><span class="line">  jint     _biased_lock_revocation_count;</span><br><span class="line"></span><br><span class="line">  TRACE_DEFINE_KLASS_TRACE_ID;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Remembered sets support for the oops in the klasses.</span></span><br><span class="line">  jbyte _modified_oops;             <span class="comment">// Card Table Equivalent (YC/CMS support)</span></span><br><span class="line">  jbyte _accumulated_modified_oops; <span class="comment">// Mod Union Equivalent (CMS support)</span></span><br><span class="line"></span><br><span class="line">  ...省略不重要的部分...</span><br></pre></td></tr></table></figure>
+<p>类的各种数据非常多，不过都是实现细节，为了更好的存储JVM规范里的<code>class file format</code>对应的数据，如类的名字符号，符号引用，常量池数据, 方法引用等等<br>而继承的类<code>Metadata</code>如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">// hotspot/src/share/vm/oops/metadata.hpp</span><br><span class="line">class Metadata : public MetaspaceObj &#123;</span><br><span class="line"> public:</span><br><span class="line">  NOT_PRODUCT(Metadata()     &#123; _valid = 0; &#125;)</span><br><span class="line">  NOT_PRODUCT(bool is_valid() const volatile &#123; return _valid == 0; &#125;)</span><br><span class="line">  ...一堆辅助函数...</span><br><span class="line"></span><br><span class="line">  int identity_hash()                &#123; return (int)(uintptr_t)this; &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br></pre></td></tr></table></figure>
+<p>没错，这个<code>identity_hash</code>函数就是<code>hashcode()</code>函数的真身, 可以看到返回了对象地址:).</p>
+<p>而<code>Metadata</code>继承的<code>MetaspaceObj</code>则是8以后才有的, java8移除了<code>永久代(PermGen)</code>，可能因为经常溢出(Spring: 你们看我干啥?), 生活在元空间的对象都要继承这个类，这个放后面聊.</p>
+<h2 id="2-2-Instance-Data"><a href="#2-2-Instance-Data" class="headerlink" title="2.2 Instance Data"></a>2.2 Instance Data</h2><p>实例数据存在<code>instanceOopDesc</code>的父类<code>oopDesc</code>类的实例里,就是上面那堆私有属性, JVM还会对字段重排序,相同的宽度可能被分到一起，比如<code>long/double</code>.所以父类的变量可能出现在子类之前，子类中较窄的变量也可能插入到父类的间隙。</p>
+<p><code>Hotspot</code>采用的方法是直接指针访问对象, 如图:</p>
+<p><img src="http://img.sound2gd.wang/2019/02/15/20190215233745.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" alt=""></p>
+<p>计算对象的大小可以单独讲一小节，也比较有意思，后面再说。</p>
+<h2 id="2-3-Padding"><a href="#2-3-Padding" class="headerlink" title="2.3 Padding"></a>2.3 Padding</h2><p>对齐填充是最常见的优化手段，CPU一次寻址一般是2的倍数，所以一般会按照2的倍数来对齐提高CPU效率.这个似乎没什么好讲的.<br>此外，JVM上对齐填充也方便gc, JVM能直接计算出对象的大小, 就能快速定位到对象的起始终止地址.</p>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本节回顾了java对象的创建方式，以及<code>hotspot</code>执行<code>new</code>指令的一系列操作，包括寻找加载类，分配初始化内存，设置对象的元数据信息到<code>header</code>。</p>
+<p>同时我们通过代码分析了<code>hotspot</code>中对象的内存布局，分为<code>Object Header</code>, <code>Instance Data</code>和<code>Padding</code>, 其中对象头包括<code>mark word</code>和<code>klass pointer</code>, <code>mark word</code>里有丰富的对象运行时信息，比如<code>hashcode,gc分代年龄等</code>,而<code>klass pointer</code>指向一个c++对象<code>Klass</code>的实例，也就是JVM类的真身.存放的类的各种信息，如类的名称，继承的父类，实现的接口，字段信息，方法信息等.而<code>Instance Data</code>存放了运行时类的实例数据值, 字段数据的地址会被重排序优化掉。</p>
+<p>希望大家有所收获:).</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
+</div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2019/02/12/JVM拾遗-3-类装载机制/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">JVM拾遗(3): 类装载机制</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="no-thumbnail">
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/JVM-JAVA/">JVM JAVA</a></p>
+                            <p class="item-title"><a href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/" class="title">JVM拾遗(4): Java对象的内存布局</a></p>
+                            <p class="item-date"><time datetime="2019-02-15T06:56:24.000Z" itemprop="datePublished">2019-02-15</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/JVM/">JVM</a></p>
+                            <p class="item-title"><a href="/2019/02/12/JVM拾遗-3-类装载机制/" class="title">JVM拾遗(3): 类装载机制</a></p>
+                            <p class="item-date"><time datetime="2019-02-12T09:39:41.000Z" itemprop="datePublished">2019-02-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/JVM/">JVM</a></p>
+                            <p class="item-title"><a href="/2018/10/25/JVM拾遗-2-平台无关性基石之Class解析/" class="title">JVM拾遗(2): 平台无关性基石之Class解析</a></p>
+                            <p class="item-date"><time datetime="2018-10-25T05:08:50.000Z" itemprop="datePublished">2018-10-25</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/JVM/">JVM</a></p>
+                            <p class="item-title"><a href="/2018/09/26/JVM拾遗-1-万米高空看JVM/" class="title">JVM拾遗(1): 万米高空看JVM</a></p>
+                            <p class="item-date"><time datetime="2018-09-26T11:24:09.000Z" itemprop="datePublished">2018-09-26</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Java/">Java</a></p>
+                            <p class="item-title"><a href="/2018/07/31/Java-NIO分析-12-NIO总结/" class="title">Java NIO分析(12): NIO总结</a></p>
+                            <p class="item-date"><time datetime="2018-07-30T16:11:50.000Z" itemprop="datePublished">2018-07-31</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">分类</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/JVM/">JVM</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/JVM-JAVA/">JVM JAVA</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Java/">Java</a><span class="category-list-count">12</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/clojure/">clojure</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/诗词鉴赏/">诗词鉴赏</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">2</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA-JVM/">JAVA JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO/">NIO</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/NIO-Linux/">NIO Linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/clojure/">clojure</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/李白/">李白</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">标签云</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/JAVA-JVM/" style="font-size: 16.67px;">JAVA JVM</a> <a href="/tags/NIO/" style="font-size: 20px;">NIO</a> <a href="/tags/NIO-Linux/" style="font-size: 10px;">NIO Linux</a> <a href="/tags/clojure/" style="font-size: 13.33px;">clojure</a> <a href="/tags/李白/" style="font-size: 10px;">李白</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">链接</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://xiaodc.github.io/">fri3nds</a>
+                    </li>
+                
+                    <li>
+                        <a href="https://wangqiao.me/">夜色残阳</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fa fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 Chris Wang<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
