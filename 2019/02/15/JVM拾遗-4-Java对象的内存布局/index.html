@@ -14,7 +14,7 @@
 <meta property="og:description" content="上一节JVM拾遗(3): 类装载机制讲了JVM如何将类装载到虚拟机以供后续使用那么JVM是如何创建类的实例呢?该对象是如何分配内存的? 1. 实例化1.1 创建对象的方式Java对象的创建, 有多种方式，最简单就是new XXClass, 还可以通过反射，xx.clone(),反序列化以及黑科技Unsafe.allocateInstance等方法. new和反射创建对象实例的时候，会初始化实例字段">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="http://img.sound2gd.wang/2019/02/15/20190215233745.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<meta property="og:updated_time" content="2019-02-15T15:47:10.000Z">
+<meta property="og:updated_time" content="2019-02-15T16:00:07.317Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="JVM拾遗(4): Java对象的内存布局">
 <meta name="twitter:description" content="上一节JVM拾遗(3): 类装载机制讲了JVM如何将类装载到虚拟机以供后续使用那么JVM是如何创建类的实例呢?该对象是如何分配内存的? 1. 实例化1.1 创建对象的方式Java对象的创建, 有多种方式，最简单就是new XXClass, 还可以通过反射，xx.clone(),反序列化以及黑科技Unsafe.allocateInstance等方法. new和反射创建对象实例的时候，会初始化实例字段">
@@ -304,6 +304,7 @@ var _hmt = _hmt || [];
 <h2 id="2-3-Padding"><a href="#2-3-Padding" class="headerlink" title="2.3 Padding"></a>2.3 Padding</h2><p>对齐填充是最常见的优化手段，CPU一次寻址一般是2的倍数，所以一般会按照2的倍数来对齐提高CPU效率.这个似乎没什么好讲的.<br>此外，JVM上对齐填充也方便gc, JVM能直接计算出对象的大小, 就能快速定位到对象的起始终止地址.</p>
 <h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3. 总结"></a>3. 总结</h1><p>本节回顾了java对象的创建方式，以及<code>hotspot</code>执行<code>new</code>指令的一系列操作，包括寻找加载类，分配初始化内存，设置对象的元数据信息到<code>header</code>。</p>
 <p>同时我们通过代码分析了<code>hotspot</code>中对象的内存布局，分为<code>Object Header</code>, <code>Instance Data</code>和<code>Padding</code>, 其中对象头包括<code>mark word</code>和<code>klass pointer</code>, <code>mark word</code>里有丰富的对象运行时信息，比如<code>hashcode,gc分代年龄等</code>,而<code>klass pointer</code>指向一个c++对象<code>Klass</code>的实例，也就是JVM类的真身.存放的类的各种信息，如类的名称，继承的父类，实现的接口，字段信息，方法信息等.而<code>Instance Data</code>存放了运行时类的实例数据值, 字段数据的地址会被重排序优化掉。</p>
+<p><code>instanceKlass</code>对象放在了方法区，<code>instanceOop</code>放在了堆，<code>instanceOop的引用</code>放在了JVM栈.</p>
 <p>希望大家有所收获:).</p>
 
         
