@@ -3,18 +3,20 @@
 <head>
     <meta charset="utf-8">
     
-    <title>归档: 2019/2 | Sound2gd的博客</title>
+    <title>JVM拾遗(5): 对象大小计算 | Sound2gd的博客</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="sound2gd的博客">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Sound2gd的博客">
-<meta property="og:url" content="http://sound2gd.wang/archives/2019/02/index.html">
+    <meta name="description" content="JVM拾遗(4): Java对象的创建及内存布局讲了JVM如何实例化对象以及对象在内存中的表示.本次讲解如何计算一个对象的大小.为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.这明显不合理会让内存爆炸的需求，怎么怼回去呢?这时候就要搬出我们的理论支持来计算一番了.">
+<meta name="keywords" content="JVM JAVA">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM拾遗(5): 对象大小计算">
+<meta property="og:url" content="http://sound2gd.wang/2019/02/16/JVM拾遗-5-对象大小计算/index.html">
 <meta property="og:site_name" content="Sound2gd的博客">
-<meta property="og:description" content="sound2gd的博客">
+<meta property="og:description" content="JVM拾遗(4): Java对象的创建及内存布局讲了JVM如何实例化对象以及对象在内存中的表示.本次讲解如何计算一个对象的大小.为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.这明显不合理会让内存爆炸的需求，怎么怼回去呢?这时候就要搬出我们的理论支持来计算一番了.">
 <meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2019-02-16T06:22:31.269Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sound2gd的博客">
-<meta name="twitter:description" content="sound2gd的博客">
+<meta name="twitter:title" content="JVM拾遗(5): 对象大小计算">
+<meta name="twitter:description" content="JVM拾遗(4): Java对象的创建及内存布局讲了JVM如何实例化对象以及对象在内存中的表示.本次讲解如何计算一个对象的大小.为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.这明显不合理会让内存爆炸的需求，怎么怼回去呢?这时候就要搬出我们的理论支持来计算一番了.">
     
 
     
@@ -194,25 +196,21 @@ var _hmt = _hmt || [];
 </aside>
 
             
-            <section id="main"><div class="timeline timeline-wrap">
-    
-            <div class="timeline-row timeline-row-major">
-                <span class="node"><i class="fa fa-calendar"></i></span>
-                <h1 class="title">2019</h1>
-            </div>
+            <section id="main"><article id="post-JVM拾遗-5-对象大小计算" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
         
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+        
+            <header class="article-header">
                 
     
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2019/02/16/JVM拾遗-5-对象大小计算/">JVM拾遗(5): 对象大小计算</a>
+        <h1 class="article-title" itemprop="name">
+            JVM拾遗(5): 对象大小计算
         </h1>
     
 
-                <div class="article-meta">
-                    
+                
+                    <div class="article-meta">
+                        
     <div class="article-date">
         <i class="fa fa-calendar"></i>
         <a href="/2019/02/16/JVM拾遗-5-对象大小计算/">
@@ -221,95 +219,147 @@ var _hmt = _hmt || [];
     </div>
 
 
-                    
+                        
     <div class="article-category">
     	<i class="fa fa-folder"></i>
         <a class="article-category-link" href="/categories/JAVA-JVM/">JAVA JVM</a>
     </div>
 
-                    
+                        
     <div class="article-tag">
         <i class="fa fa-tag"></i>
         <a class="tag-link" href="/tags/JVM-JAVA/">JVM JAVA</a>
     </div>
 
-                </div>
-            </div>
-        </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
+                    </div>
                 
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/">JVM拾遗(4): Java对象的创建及内存布局</a>
-        </h1>
-    
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <a href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/" title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>讲了JVM如何实例化对象以及对象在内存中的表示.<br>本次讲解如何计算一个对象的大小.<br><br>为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.<br>这明显不合理会让内存爆炸的需求，怎么怼回去呢?<br><br>这时候就要搬出我们的理论支持来计算一番了.<br><br><a id="more"></a>
+<h1 id="1-数据类型及大小"><a href="#1-数据类型及大小" class="headerlink" title="1. 数据类型及大小"></a>1. 数据类型及大小</h1><p>这个基本功不扎实的同学可能不清楚, 不过相信大部分老司机都知道.</p>
+<p>JVM的数据类型分为<code>基本数据类型</code>和<code>引用数据类型</code>.</p>
+<p>基本数据类型有:</p>
+<ul>
+<li><code>long</code>/<code>double</code>: 8字节, 长整型和双精度浮点型</li>
+<li><code>int</code>/<code>float</code>: 4字节, 整数和浮点数</li>
+<li><code>char</code>,<code>short</code>: 2字节,字符型和短整型</li>
+<li><code>byte</code>: 1字节, 整数</li>
+</ul>
+<p>在JDK8, 64位<code>HotSpot</code>上, 引用数据类型都是直接指针, 如果开了压缩指针，就是4字节，没开就是8字节</p>
+<p>用原生数据类型就是为了提高性能的.</p>
+<p>后来为了满足一切皆对象的概念和泛型系统，出了一堆包装类, 造成装箱和拆箱的一堆性能问题不说, 还浪费内存.</p>
+<p>比如一个<code>int</code>原生类型才4字节，而<code>Integer</code>包装类对象头就至少12字节了..</p>
+<h1 id="2-对象的大小包含哪些"><a href="#2-对象的大小包含哪些" class="headerlink" title="2. 对象的大小包含哪些"></a>2. 对象的大小包含哪些</h1><p>前面讲过一个对象包含3部分数据:</p>
+<ol>
+<li>对象头(Object Header)</li>
+<li>实例数据(Instance Data)</li>
+<li>对齐填充(Padding)</li>
+</ol>
+<p>对象头前面说过, 在64位的虚拟机上开了压缩指针就是12字节，没开就是16字节.<br>实例数据的大小依据数据类型的大小来计算, 注意要子类的对象大小要把父类的实例数据大小也计算进去.</p>
+<p>对齐填充是按照对象里最宽的数据类型的大小来对齐的, 比如最大的是<code>long</code>8字节, 那么就是按照8的倍数来对齐.</p>
+<h1 id="3-案例"><a href="#3-案例" class="headerlink" title="3. 案例"></a>3. 案例</h1><p>把前面提到的天气数据类简化，算算100000个天气对象的大小，如下:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">WeatherDO</span> </span>&#123;</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">double</span> pm25;</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">int</span> uvLevel;</span><br><span class="line">  <span class="keyword">private</span> String tips;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>按照理论，开启压缩指针后,对象头占12字节， 实例数据最长的pm25是8个字节, int是4字节, String是引用类型，占4字节, 按照8字节对齐.<br>总共是12+8+4+4=28字节，按照8字节对齐是32字节，要4个字节的对齐填充.</p>
+<h2 id="Java-Object-Layout-JOL"><a href="#Java-Object-Layout-JOL" class="headerlink" title="Java Object Layout, JOL"></a>Java Object Layout, JOL</h2><p><a href="https://openjdk.java.net/projects/code-tools/jol/" target="_blank" rel="noopener">JOL</a>是openjdk提供的用来验证JVM的内存布局方案的工具.<br>工具内部使用了<code>Unsafe</code>, <code>JVMTI</code>(工具接口, 后面会聊), <code>ServiceabilityAgent</code>(SA)来计算，比基于堆转储(heap dump)出来的会更精确.<br>我们可以去<a href="https://mvnrepository.com/artifact/org.openjdk.jol/jol-cli" target="_blank" rel="noopener">maven仓库</a>挑个版本将jar包下下来使用.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ curl -O -L http://central.maven.org/maven2/org/openjdk/jol/jol-cli/0.9/jol-cli-0.9.jar</span><br></pre></td></tr></table></figure>
+<p>然后这样使用:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ java -cp .:./jol-cli-0.9-full.jar org.openjdk.jol.Main internals WeatherDO</span><br></pre></td></tr></table></figure>
+<p>得到的结果(JVM默认开启压缩指针):</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">WeatherDO object internals:</span><br><span class="line"> OFFSET  SIZE               TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4                    (object header)                           05 00 00 00 (00000101 00000000 00000000 00000000) (5)</span><br><span class="line">      4     4                    (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)</span><br><span class="line">      8     4                    (object header)                           a3 11 01 f8 (10100011 00010001 00000001 11111000) (-134147677)</span><br><span class="line">     12     4                int WeatherDO.uvLevel                         0</span><br><span class="line">     16     8             double WeatherDO.pm25                            0.0</span><br><span class="line">     24     4   java.lang.String WeatherDO.tips                            null</span><br><span class="line">     28     4                    (loss due to the next object alignment)</span><br><span class="line">Instance size: 32 bytes</span><br><span class="line">Space losses: 0 bytes internal + 4 bytes external = 4 bytes total</span><br></pre></td></tr></table></figure>
+<p>可以看到，Instance size=32字节, 和我们的计算一致, 十万条对象数据就是3M.<br>针对笔者当时的业务场景，这是一个频繁的需求,一小块业务就几M的对象, 高并发下就杯具了:)</p>
+<h1 id="4-总结"><a href="#4-总结" class="headerlink" title="4. 总结"></a>4. 总结</h1><p>本节回顾了java对象的内存布局，并指出<code>Hotspot</code>虚拟机实现下对象的大小计算方法.</p>
 
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/">
-            <time datetime="2019-02-15T06:56:24.000Z" itemprop="datePublished">2019-02-15</time>
-        </a>
-    </div>
-
-
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/JVM-JAVA/">JVM JAVA</a>
-    </div>
-
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
-    </div>
-
-                </div>
-            </div>
+        
         </div>
-    
-        <div class="timeline-row">
-            <span class="node"></span>
-            <div class="content">
-                
-    
-        <h1 itemprop="name">
-            <a class="timeline-article-title" href="/2019/02/12/JVM拾遗-3-类装载机制/">JVM拾遗(3): 类装载机制</a>
-        </h1>
-    
-
-                <div class="article-meta">
-                    
-    <div class="article-date">
-        <i class="fa fa-calendar"></i>
-        <a href="/2019/02/12/JVM拾遗-3-类装载机制/">
-            <time datetime="2019-02-12T09:39:41.000Z" itemprop="datePublished">2019-02-12</time>
-        </a>
-    </div>
+        <footer class="article-footer">
+            <div class="share-container">
 
 
-                    
-    <div class="article-category">
-    	<i class="fa fa-folder"></i>
-        <a class="article-category-link" href="/categories/JVM/">JVM</a>
-    </div>
 
-                    
-    <div class="article-tag">
-        <i class="fa fa-tag"></i>
-        <a class="tag-link" href="/tags/JAVA-JVM/">JAVA JVM</a>
-    </div>
-
-                </div>
-            </div>
-        </div>
-    
+    <div class="a2a_kit a2a_default_style">
+    <a class="a2a_dd" href="https://www.addtoany.com/share">Share</a>
+    <span class="a2a_divider"></span>
+    <a class="a2a_button_facebook"></a>
+    <a class="a2a_button_twitter"></a>
+    <a class="a2a_button_google_plus"></a>
+    <a class="a2a_button_pinterest"></a>
+    <a class="a2a_button_tumblr"></a>
 </div>
+<script type="text/javascript" src="//static.addtoany.com/menu/page.js"></script>
+<style>
+    .a2a_menu {
+        border-radius: 4px;
+    }
+    .a2a_menu a {
+        margin: 2px 0;
+        font-size: 14px;
+        line-height: 16px;
+        border-radius: 4px;
+        color: inherit !important;
+        font-family: 'Microsoft Yahei';
+    }
+    #a2apage_dropdown {
+        margin: 10px 0;
+    }
+    .a2a_mini_services {
+        padding: 10px;
+    }
+    a.a2a_i,
+    i.a2a_i {
+        width: 122px;
+        line-height: 16px;
+    }
+    a.a2a_i .a2a_svg,
+    a.a2a_more .a2a_svg {
+        width: 16px;
+        height: 16px;
+        line-height: 16px;
+        vertical-align: top;
+        background-size: 16px;
+    }
+    a.a2a_i {
+        border: none !important;
+    }
+    a.a2a_menu_show_more_less {
+        margin: 0;
+        padding: 10px 0;
+        line-height: 16px;
+    }
+    .a2a_mini_services:after{content:".";display:block;height:0;clear:both;visibility:hidden}
+    .a2a_mini_services{*+height:1%;}
+</style>
+
+</div>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+    
+        <a href="/2019/02/15/JVM拾遗-4-Java对象的内存布局/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">下一篇</strong>
+            <div class="article-nav-title">JVM拾遗(4): Java对象的创建及内存布局</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
 </section>
             
                 
