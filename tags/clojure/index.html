@@ -1,0 +1,198 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>clojure | Chris的博客</title>
+<meta property="og:title" content="clojure - Chris的博客">
+<meta property="og:type" content="article">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="clojure">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/tags/clojure/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<link rel=alternate type=application/rss+xml href=http://sound2gd.wang/tags/clojure/index.xml title=Chris的博客>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<h3 class=archive-title>
+包含标签
+<span class=keyword>clojure</span>
+的文章
+</h3>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/>luminus整合shadow-cljs打包</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2018年3月21日
+</date>
+<div class=post-content>
+<p><a href=https://github.com/thheller/shadow-cljs>shadow-cljs</a>是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:</p>
+<ol>
+<li>支持直接引用npm依赖, 以前还需要使用<code>cljsjs</code>转一次，不仅麻烦而且还是过时的</li>
+<li>和webpack类似的代码分割, 依赖</li>
+</ol>
+<p>当然，<strong>cljs+css代码重载</strong>是最基本的，而且构建速度也足够快</p>……
+<p class=readmore><a href=http://sound2gd.wang/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/>阅读全文</a></p>
+</div>
+</article>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/%E4%BD%BF%E7%94%A8clj1.9%E5%BF%AB%E9%80%9F%E5%90%AF%E5%8A%A8clojure%E7%9A%84repl/>使用clj1.9快速启动clojure的repl</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2017年12月15日
+</date>
+<div class=post-content>
+<p>随着<a href=https://clojure.org/news/2017/12/08/clojure19>Clojure1.9</a>的发布，给我们带来了spec和命令行的支持.
+mac下通过<a href=https://brew.sh>HomeBrew</a>可以快速安装最新版clojure,自带clj命令行工具</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh>brew install clojure
+</code></pre></td></tr></table>
+</div>
+</div><p>linux平台按照</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh>curl -O https://download.clojure.org/install/linux-install.sh
+chmod +x linux-install.sh
+sudo ./linux-install.sh
+</code></pre></td></tr></table>
+</div>
+</div><p>然后通过<code>clj</code>命令就可以快速启动clj的repl.
+原来用<code>lein repl</code>和<code>boot repl</code>启动需要1分钟，<code>clj</code>命令启动只需要短短的几秒。</p>……
+<p class=readmore><a href=http://sound2gd.wang/post/%E4%BD%BF%E7%94%A8clj1.9%E5%BF%AB%E9%80%9F%E5%90%AF%E5%8A%A8clojure%E7%9A%84repl/>阅读全文</a></p>
+</div>
+</article>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

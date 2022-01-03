@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>JAVA JVM on Chris的博客</title><link>http://sound2gd.wang/tags/java-jvm/</link><description>Recent content in JAVA JVM on Chris的博客</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 15 Feb 2019 14:56:24 +0800</lastBuildDate><atom:link href="http://sound2gd.wang/tags/java-jvm/index.xml" rel="self" type="application/rss+xml"/><item><title>JVM拾遗(4): Java对象的创建及内存布局</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/</link><pubDate>Fri, 15 Feb 2019 14:56:24 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/</guid><description>&lt;p>上一节&lt;a href="http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/">JVM拾遗-3-类装载机制&lt;/a>讲了JVM如何将类装载到虚拟机以供后续使用
+那么JVM是如何创建类的实例呢?该对象是如何分配内存的?&lt;/p>
+&lt;h1 id="1-实例化">1. 实例化&lt;/h1>
+&lt;h2 id="11-创建对象的方式">1.1 创建对象的方式&lt;/h2>
+&lt;p>Java对象的创建, 有多种方式，最简单就是&lt;code>new XXClass&lt;/code>, 还可以通过&lt;code>反射&lt;/code>，&lt;code>xx.clone()&lt;/code>,&lt;code>反序列化&lt;/code>以及黑科技&lt;code>Unsafe.allocateInstance&lt;/code>等方法.&lt;/p>
+&lt;p>&lt;code>new&lt;/code>和反射创建对象实例的时候，会初始化实例字段.&lt;/p>
+&lt;p>如果类没有构造器，会默认添加构造器，并且编译成&lt;code>&amp;lt;init&amp;gt;&lt;/code>方法.
+默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.&lt;/p></description></item><item><title>JVM拾遗(3): 类装载机制</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/</link><pubDate>Tue, 12 Feb 2019 17:39:41 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/</guid><description>&lt;p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?&lt;/p>
+&lt;p>&lt;strong>简言之: JVM会读取&lt;code>.class&lt;/code>文件并加载和初始化到方法区&lt;/strong>, 之后才能被后续程序使用.
+同时该过程还需要满足一些要求:&lt;/p>
+&lt;ul>
+&lt;li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法
+&lt;ul>
+&lt;li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换&lt;/li>
+&lt;li>class文件里的各个符号引用要合法&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>允许运行时添加功能, 如各种分析工具包(arthas)等&lt;/li>
+&lt;/ul>
+&lt;p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。&lt;/p></description></item><item><title>JVM拾遗(2): 平台无关性基石之Class解析</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/</link><pubDate>Thu, 25 Oct 2018 13:08:50 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/</guid><description>&lt;p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。
+前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是
+先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。&lt;/p>
+&lt;p>这次谈谈Java的平台无关性的基石: &lt;code>Class&lt;/code>文件。&lt;/p></description></item><item><title>JVM拾遗(1): 万米高空看JVM</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/</link><pubDate>Wed, 26 Sep 2018 19:24:09 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/</guid><description>&lt;p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。
+关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。&lt;/p>
+&lt;p>以前看过林林总总的JVM书籍，比如周志明大佬的&lt;code>&amp;lt;&amp;lt;深入理解Java虚拟机&amp;gt;&amp;gt;&lt;/code>和张秀宏大佬的&lt;code>&amp;lt;&amp;lt;自己动手写Java虚拟机&amp;gt;&amp;gt;&lt;/code>, 也跟着造了个小JVM,所以也尝试将知识整理下
+本系列会比较长，但是会把知识点细分，前后贯通串起来。
+如果没有特殊指出，JVM使用的是&lt;a href="https://en.wikipedia.org/wiki/HotSpot">Hotspot VM&lt;/a>,JDK使用的是&lt;a href="http://openjdk.java.net">OpenJDK8&lt;/a>&lt;/p></description></item></channel></rss>

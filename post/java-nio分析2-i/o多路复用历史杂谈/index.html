@@ -1,0 +1,254 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Java NIO分析(2): I/O多路复用历史杂谈 | Chris的博客</title>
+<meta property="og:title" content="Java NIO分析(2): I/O多路复用历史杂谈 - Chris的博客">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-06-17T09:32:06+08:00">
+<meta property="article:modified_time" content="2018-06-17T09:32:06+08:00">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="Java NIO分析(2): I/O多路复用历史杂谈">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a class=current href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<article class=post>
+<header>
+<h1 class=post-title>Java NIO分析(2): I/O多路复用历史杂谈</h1>
+</header>
+<date class="post-meta meta-date">
+2018年6月17日
+</date>
+<div class=post-content>
+<p>前面<a href=/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/>Java-NIO分析-1-Unix网络模型</a>讲过5种经典I/O模型，
+现代企业的场景一般是<strong>高并发高流量</strong>,<strong>长连接</strong>, 假设硬件资源充足，如何提高应用单机能接受链接的上限?
+先讲段历史</p>
+<h2 id=unix的出现>UNIX的出现</h2>
+<p>20世纪60年代中期， 那会儿还是<a href=https://en.wikipedia.org/wiki/Batch_processing>批处理任务</a>的天下，也就是有一堆job一个个顺序做，
+一个做完了才做下一个. 举个栗子, 你没法边听音乐边写博客，也没法边下边播x老师的电影. 随后<a href=https://en.wikipedia.org/wiki/Time-sharing>分时</a>这革命性的理念提出来了, 每个job只允许占有一小段CPU时间片执行代码， 假如cpu处理的够快，看起来就像是一堆job并行一样。</p>
+<p><strong>分时</strong>理念无疑极大地减少了写代码和获取代码执行结果的时间,到了<strong>70</strong>年代，有人提出要发明一种<strong>更好的</strong>，<strong>多用户的</strong>, <strong>分时的</strong>环境来执行大多数的共同任务，比如 执行需要大量CPU计算的程序，大量的磁盘访问等等, 这个环境后来就发展成了<a href=https://en.wikipedia.org/wiki/Unix>Unix</a></p>
+<p>当时，程序阻塞的条件是:</p>
+<ul>
+<li>等待CPU</li>
+<li>等待磁盘I/O</li>
+<li>等待用户输入</li>
+<li>等待shell命令结果或者终端结果</li>
+</ul>
+<p>在当时也没有多少真正的IPC手段, pipe算是一个。不过对于当时的情况来说，一个进程最多只能打开20个fd, 每个用户最多只能开20个进程
+也没有多少IPC和复杂I/O的需求。</p>
+<p>早期的Unix也没有fd复用的概念, 如果你ssh远程登录Unix系统，系统要同时处理用户的输入，还给用户输出.当时是靠<code>cu</code>这个命令来实现的，
+<code>cu</code>会创建俩进程，一个负责读一个负责写。因为当时的I/O都是阻塞的，如果要同时读写就得搞俩进程.</p>
+<h2 id=socket>Socket</h2>
+<p>到了1983年，BSD4.2发布的时候，一起发布的还有我们今天耳熟能详的<a href=https://en.wikipedia.org/wiki/Berkeley_sockets>BSD Socket API</a>和<code>TCP/IP</code>协议栈。
+<code>Socket</code>解决了不一定在同一台机器的不同进程之间的通信问题,是一种有效的IPC手段。<code>Socket</code>结合<code>TCP/IP</code>协议还解决了计算机之间的网络通讯问题.</p>
+<p>然而读写fd依然是阻塞的， 假如你要处理俩socket,那么可能在阻塞读socket1的时候，socket2的数据因为来不及处理丢失了。</p>
+<p>随着<code>Socket</code>API一起发布的还有大名鼎鼎的<code>select</code>系统调用, 也即<code>I/O多路复用</code>的实现。<code>I/O多路复用</code>通过使用一个系统函数，如<code>select</code>, 可以同时等待多个fd的可读，可写等状态。</p>
+<p>在没有select之前，一般的unix网络程序是这么写的(accept-and-fork模型)</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c>listenfd <span style=color:#000;font-weight:700>=</span> bind();
+<span style=color:#000;font-weight:700>while</span>(<span style=color:#099>1</span>) {
+ fd <span style=color:#000;font-weight:700>=</span> accept(listenfd);
+ <span style=color:#000;font-weight:700>if</span> (fork() <span style=color:#000;font-weight:700>==</span> <span style=color:#099>0</span>) {
+   close(fd);
+
+   <span style=color:#998;font-style:italic>// 具体的处理代码
+</span><span style=color:#998;font-style:italic></span>   ...
+   ...
+
+   exit(<span style=color:#099>0</span>); <span style=color:#998;font-style:italic>// 处理完子进程退出
+</span><span style=color:#998;font-style:italic></span> }
+ 
+ <span style=color:#998;font-style:italic>// 关闭fd避免fd泄露
+</span><span style=color:#998;font-style:italic></span> close(fd)
+}
+</code></pre></td></tr></table>
+</div>
+</div><p><code>accept-and-fork</code>是非常费系统资源的，因为每启动一个新的进程，就需要开辟新的栈，分配虚拟内存等,而且多个进程之间由于缺乏IPC手段，
+状态难以共享，对于服务端程序来说是灾难。</p>
+<h2 id=select>Select</h2>
+<p><code>Select</code>发布以后, I/O就能复用了，你可以询问内核哪些fd准备就绪了，然后去发系统调用读数据,
+读fd的过程是阻塞的，使用select可以避免无意义的阻塞, 这样即使只有一个进程也可以处理多个socket fd的读写</p>
+<p>当时贝尔实验室有个产品叫<code>blit</code>, 是一种多用户实时终端，和现在的terminal差不多，这就要求应用能同时处理读和写, 像<code>cu</code>这种靠俩进程
+来实现类似多路复用的效果，只能称为一种hack,有了select就能真正多路复用socket fd. 这样你就能在应用进程里方便的处理读和写socket fd而不
+无意义的阻塞线程。</p>
+<p>随后又发布了<code>Non-blocking</code>API，但是它和select不同，select是帮助你多路复用, <code>Non-blocking</code>API是指你在读fd的时候不会阻塞等待<strong>数据准备和内核拷贝数据</strong>的完成, 这个时候进程可以干别的事情</p>
+<p><code>Non-Blocking</code>也可以实现类似select的功能，不过那是应用层去做select的功能，也就是应用层需要轮询描述符是都就绪， 假如没有就绪，对fd的read会直接返回一个errno, 代表没有数据可读等。
+轮询的缺点是浪费了太多CPU时间，因为read是要发系统调用的，进程会从应用态切换到内核态, 每次这个切换过程都是资源的一种浪费.</p>
+<p><code>select</code>还会启动多个进程能复用的一个<code>inetd</code>进程。由于当时一个进程才能开最多20个fd，所以select才会设置
+fd_set的最大值是1024,在当时看来是远远用不完的。</p>
+<hr>
+<ol>
+<li><a href=https://ia801605.us.archive.org/33/items/bstj57-6-1947/bstj57-6-1947_text.pdf>Unix Time-Sharing System: A Retrospective</a></li>
+</ol>
+</div>
+<div class=post-archive>
+<ul class=post-copyright>
+<li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li>
+<li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/</a></li>
+<li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li>
+</ul>
+</div>
+<br>
+<div class=post-archive>
+<h2>See Also</h2>
+<ul class=listing>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/>Java NIO分析(1): Unix网络模型</a></li>
+<li><a href=/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/>luminus整合shadow-cljs打包</a></li>
+<li><a href=/post/%E4%BD%BF%E7%94%A8clj1.9%E5%BF%AB%E9%80%9F%E5%90%AF%E5%8A%A8clojure%E7%9A%84repl/>使用clj1.9快速启动clojure的repl</a></li>
+<li><a href=/about/>关于我</a></li>
+<li><a href=/archives/>归档</a></li>
+</ul>
+</div>
+<div class="post-meta meta-tags">
+<ul class=clearfix>
+<li><a href=/tags/nio>NIO</a></li>
+</ul>
+</div>
+</article>
+<div class="post bg-white">
+<script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script>
+</div>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[['$','$']],processEscapes:!0}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

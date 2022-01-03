@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Posts on Chris的博客</title><link>http://sound2gd.wang/post/</link><description>Recent content in Posts on Chris的博客</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Sat, 16 Feb 2019 10:38:14 +0800</lastBuildDate><atom:link href="http://sound2gd.wang/post/index.xml" rel="self" type="application/rss+xml"/><item><title>JVM拾遗(5): 对象大小计算</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/</link><pubDate>Sat, 16 Feb 2019 10:38:14 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/</guid><description>&lt;p>&lt;a href="http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/">JVM拾遗-4-Java对象的内存布局&lt;/a>讲了JVM如何实例化对象以及对象在内存中的表示.
+本次讲解如何计算一个对象的大小.&lt;/p>
+&lt;p>为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.
+这明显不合理会让内存爆炸的需求，怎么怼回去呢?&lt;/p>
+&lt;p>这时候就要搬出我们的理论支持来计算一番了.&lt;/p></description></item><item><title>JVM拾遗(4): Java对象的创建及内存布局</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/</link><pubDate>Fri, 15 Feb 2019 14:56:24 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/</guid><description>&lt;p>上一节&lt;a href="http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/">JVM拾遗-3-类装载机制&lt;/a>讲了JVM如何将类装载到虚拟机以供后续使用
+那么JVM是如何创建类的实例呢?该对象是如何分配内存的?&lt;/p>
+&lt;h1 id="1-实例化">1. 实例化&lt;/h1>
+&lt;h2 id="11-创建对象的方式">1.1 创建对象的方式&lt;/h2>
+&lt;p>Java对象的创建, 有多种方式，最简单就是&lt;code>new XXClass&lt;/code>, 还可以通过&lt;code>反射&lt;/code>，&lt;code>xx.clone()&lt;/code>,&lt;code>反序列化&lt;/code>以及黑科技&lt;code>Unsafe.allocateInstance&lt;/code>等方法.&lt;/p>
+&lt;p>&lt;code>new&lt;/code>和反射创建对象实例的时候，会初始化实例字段.&lt;/p>
+&lt;p>如果类没有构造器，会默认添加构造器，并且编译成&lt;code>&amp;lt;init&amp;gt;&lt;/code>方法.
+默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.&lt;/p></description></item><item><title>JVM拾遗(3): 类装载机制</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/</link><pubDate>Tue, 12 Feb 2019 17:39:41 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/</guid><description>&lt;p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?&lt;/p>
+&lt;p>&lt;strong>简言之: JVM会读取&lt;code>.class&lt;/code>文件并加载和初始化到方法区&lt;/strong>, 之后才能被后续程序使用.
+同时该过程还需要满足一些要求:&lt;/p>
+&lt;ul>
+&lt;li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法
+&lt;ul>
+&lt;li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换&lt;/li>
+&lt;li>class文件里的各个符号引用要合法&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>允许运行时添加功能, 如各种分析工具包(arthas)等&lt;/li>
+&lt;/ul>
+&lt;p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。&lt;/p></description></item><item><title>JVM拾遗(2): 平台无关性基石之Class解析</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/</link><pubDate>Thu, 25 Oct 2018 13:08:50 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/</guid><description>&lt;p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。
+前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是
+先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。&lt;/p>
+&lt;p>这次谈谈Java的平台无关性的基石: &lt;code>Class&lt;/code>文件。&lt;/p></description></item><item><title>JVM拾遗(1): 万米高空看JVM</title><link>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/</link><pubDate>Wed, 26 Sep 2018 19:24:09 +0800</pubDate><guid>http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/</guid><description>&lt;p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。
+关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。&lt;/p>
+&lt;p>以前看过林林总总的JVM书籍，比如周志明大佬的&lt;code>&amp;lt;&amp;lt;深入理解Java虚拟机&amp;gt;&amp;gt;&lt;/code>和张秀宏大佬的&lt;code>&amp;lt;&amp;lt;自己动手写Java虚拟机&amp;gt;&amp;gt;&lt;/code>, 也跟着造了个小JVM,所以也尝试将知识整理下
+本系列会比较长，但是会把知识点细分，前后贯通串起来。
+如果没有特殊指出，JVM使用的是&lt;a href="https://en.wikipedia.org/wiki/HotSpot">Hotspot VM&lt;/a>,JDK使用的是&lt;a href="http://openjdk.java.net">OpenJDK8&lt;/a>&lt;/p></description></item><item><title>Java NIO分析(12): NIO总结</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/</link><pubDate>Tue, 31 Jul 2018 00:11:50 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/</guid><description>&lt;p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧
+写这个系列的起因是各个框架比如&lt;code>netty&lt;/code>, &lt;code>tomcat&lt;/code>, &lt;code>jetty&lt;/code>这些高性能框架的
+基石就是&lt;code>NIO&lt;/code>, 一直想讲讲它们高性能的原因。&lt;/p></description></item><item><title>Java NIO分析(11): 零拷贝技术以及NIO的支持</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/</link><pubDate>Tue, 24 Jul 2018 16:44:47 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/</guid><description>&lt;p>前面已经讲了&lt;code>Selector&lt;/code>,&lt;code>SocketChannel&lt;/code>和&lt;code>DirectBuffer&lt;/code>, 这些是NIO网络编程中最核心的组件
+接下来我们会再讲几点非核心的优化(不代表不重要, 只是API不占NIO设计的大头):&lt;/p>
+&lt;ul>
+&lt;li>文件传输(File Transfer): 文件内容直接发送到网卡, 或者从网卡直接读到文件里&lt;/li>
+&lt;li>内存映射文件(Memory-mapped Files): 将文件的一块映射到内存&lt;/li>
+&lt;/ul>
+&lt;p>这两项本质上都基于&lt;code>零拷贝(zero copy)&lt;/code>技术。&lt;/p></description></item><item><title>Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/</link><pubDate>Sat, 21 Jul 2018 23:45:47 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/</guid><description>&lt;p>前面我们详细讲了&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/">Java-NIO分析-8-Selector详解&lt;/a>和&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/">Java-NIO分析-9-从BSD-socket到SocketChannel&lt;/a>, 分别是NIO的事件分发器和非阻塞处理器.&lt;/p>
+&lt;p>为了支持&lt;code>Channel&lt;/code>的双向读写和&lt;code>Scatter/Gather&lt;/code>操作，我们还需要&lt;code>Buffer&lt;/code>,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解.&lt;/p>
+&lt;p>接下来我们聊聊JVM使用堆外内存的沧桑历史以及为什么要设计出&lt;code>DirectBuffer&lt;/code>。&lt;/p></description></item><item><title>Java NIO分析(9): 从BSD socket到SocketChannel</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/</link><pubDate>Mon, 16 Jul 2018 07:56:32 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/</guid><description>&lt;p>前面我们讲了高并发核心&lt;code>Selector&lt;/code>的源码分析，看到其对操作系统I/O多路复用的简单封装。
+有了I/O多路复用之后，我们还需要&lt;strong>非阻塞的socket读写操作&lt;/strong>.&lt;/p>
+&lt;p>因为内核告诉你&lt;strong>A连接&lt;/strong>有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的
+socket API, 那么进程或者线程会在这里&lt;strong>阻塞&lt;/strong>，浪费了CPU的时钟周期和珍贵的线程资源。
+使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继续读下一个&lt;strong>B连接&lt;/strong>的数据。&lt;/p>
+&lt;p>&lt;code>SocketChannel&lt;/code>就是NIO对于非阻塞socket操作的支持的组件，其在socket上封装了一层, 所以我们先从&lt;code>Socket API&lt;/code>说起。&lt;/p></description></item><item><title>Java NIO分析(8): 高并发核心Selector详解</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/</link><pubDate>Thu, 12 Jul 2018 23:11:27 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/</guid><description>&lt;p>上节&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/">Java-NIO分析-7-NIO核心分析之Channel-Buffer和Selector&lt;/a>介绍了&lt;code>Channel&lt;/code>，&lt;code>Buffer&lt;/code>和&lt;code>Selector&lt;/code>的基本用法
+有了感性认识之后，来看看Selector的底层是如何实现的。&lt;/p>
+&lt;h1 id="1-selector设计">1. Selector设计&lt;/h1>
+&lt;p>笔者下载得是&lt;a href="https://download.java.net/openjdk/jdk8">openjdk8&lt;/a>的源码, 画出类图&lt;/p>
+&lt;p>
+&lt;a data-fancybox="gallery" href="http://img.sound2gd.wang/2018/07/14/20180714234754.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+&lt;img class="mx-auto" alt="" src="http://img.sound2gd.wang/2018/07/14/20180714234754.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10" />
+&lt;/a>
+&lt;/p>
+&lt;p>比较清晰得看到，openjdk中Selector的实现是&lt;code>SelectorImpl&lt;/code>,
+然后SelectorImpl又将职责委托给了具体的平台，比如图中框出的linux2.6以后才有的&lt;code>EpollSelectorImpl&lt;/code>, Windows平台则是&lt;code>WindowsSelectorImpl&lt;/code>, &lt;code>MacOSX&lt;/code>平台是&lt;code>KQueueSelectorImpl&lt;/code>.&lt;/p>
+&lt;p>从名字也可以猜到，openjdk肯定在底层还是用&lt;code>epoll&lt;/code>,&lt;code>kqueue&lt;/code>，&lt;code>iocp&lt;/code>这些技术来实现的I/O多路复用。前面 &lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/">Java-NIO分析-3-I-O多路复用之select系统调用&lt;/a> ,&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/">Java-NIO分析-4-I-O多路复用之poll系统调用&lt;/a> , &lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/">Java-NIO分析-5-I-O多路复用之epoll系统调用&lt;/a>写了3篇来说明其用法，感兴趣的读者可以回头看看。&lt;/p></description></item><item><title>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/</link><pubDate>Tue, 10 Jul 2018 21:34:17 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/</guid><description>&lt;p>上次&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/">Java-NIO分析-6-Java-NIO中的概念&lt;/a>讲到了NIO的设计思想,
+即&lt;code>Doug Lea&lt;/code>大佬受&lt;code>AWT&lt;/code>启发得到的&lt;strong>事件驱动机制&lt;/strong>, 关键点在于&lt;/p>
+&lt;ul>
+&lt;li>非阻塞处理器&lt;/li>
+&lt;li>事件分发组件&lt;/li>
+&lt;/ul>
+&lt;p>在NIO的API中，&lt;code>Channel&lt;/code>就是实现非阻塞的组件，而事件分发(Dispatcher)使用的是&lt;code>Selector&lt;/code>组件，
+在传统的I/O流(&lt;code>Stream&lt;/code>)是有方向的，而NIO支持双向读写，这样就需要将流中的数据读取到某个缓冲组件里，
+即&lt;code>Buffer&lt;/code>组件.&lt;/p>
+&lt;p>&lt;code>Buffer&lt;/code>组件还有个特殊的实现&lt;code>DirectByteBuffer&lt;/code>, 可以申请&lt;strong>堆外内存&lt;/strong>，关于为什么要申请堆外内存后续会谈。&lt;/p></description></item><item><title>Java NIO分析(6): 从BIO到NIO-设计和概念</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/</link><pubDate>Fri, 06 Jul 2018 07:04:55 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/</guid><description>&lt;p>前面介绍了Unix的I/O模型以及多路复用的c实现，为什么要介绍这些呢？ 因为JVM是用c++写的，JDK的native方法也都是用c写的，最后它们调用
+的还是操作系统底层的api,所以了解一些关键的底层原理还是有必要的。&lt;/p></description></item><item><title>Java NIO分析(5): I/O多路复用之epoll系统调用</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</link><pubDate>Sun, 01 Jul 2018 17:59:51 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</guid><description>&lt;h1 id="1-epoll概念">1. epoll概念&lt;/h1>
+&lt;p>&lt;code>poll&lt;/code>系统调用相比于&lt;code>select&lt;/code>主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>fd数组整体在内核空间和用户空间之间拷贝&lt;/strong>&lt;/li>
+&lt;li>&lt;strong>遍历整个fd数组找事件浪费资源&lt;/strong>&lt;/li>
+&lt;/ol>
+&lt;p>这俩性能问题在&lt;strong>Banga&lt;/strong>在1999年写了篇论文&lt;a href="http://static.usenix.org/event/usenix99/full_papers/banga/banga.pdf">A Scalable and Explicit Event
+Delivery Mechanism for UNIX&lt;/a>,提出&lt;code>select&lt;/code>和&lt;code>poll&lt;/code>都是无状态的，需要用户空间的进程&lt;strong>自行遍历查找事件&lt;/strong>, 一种改进方案是&lt;strong>内核内部自己维护事件集合&lt;/strong>.通过一个类似&lt;code>declare_interest&lt;/code>的系统调用，内核能够&lt;strong>增量得更新进程感兴趣的事件集合列表&lt;/strong>, 应用进程通过使用&lt;code>get_next_event&lt;/code>调用能派发新事件给内核。&lt;/p>
+&lt;p>根据论文的研究成果，&lt;code>LINUX&lt;/code>和&lt;code>FreeBSD&lt;/code>各自给出的解决方案：&lt;code>epoll&lt;/code>和&lt;code>kqueue&lt;/code>.我们主要讨论epoll, 毕竟日常服务端环境都是LINUX.&lt;/p>
+&lt;p>在LINUX内核2.6以上，&lt;code>epoll&lt;/code>才受到支持。&lt;/p></description></item><item><title>Java NIO分析(4): I/O多路复用之poll系统调用</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</link><pubDate>Fri, 29 Jun 2018 11:46:02 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</guid><description>&lt;p>&lt;code>poll&lt;/code>系统调用主要解决了&lt;code>select&lt;/code>系统调用的2个问题：&lt;/p>
+&lt;ol>
+&lt;li>文件描述符数量(fd_setsize = 32)太小, 而且数值是使用宏写死的,这样在32位机器上最大文件描述符数量只有32*32=1024&lt;/li>
+&lt;li>文件描述符集(fd_set)这种&lt;code>值-结果参数&lt;/code>的api设计不是很好, select系统调用的时候要分别传读set,写set，更多事件不好细分&lt;/li>
+&lt;/ol>
+&lt;p>&lt;code>poll&lt;/code>系统调用使用了pollfd数据结构来表示事件数组，没有了&lt;code>fd_setsize&lt;/code>的限制,同时支持更多的事件类型&lt;/p></description></item><item><title>Java NIO分析(3): I/O多路复用之select系统调用</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</link><pubDate>Thu, 28 Jun 2018 09:48:07 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</guid><description>&lt;p>前面讲了一些&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/">Java-NIO分析-2-I-O多路复用历史杂谈&lt;/a>, 谈到了多路复用的发展历史
+以及为什么需要它。今天讲广受各大内核支持的&lt;code>select&lt;/code>系统调用,&lt;code>select&lt;/code>允许进程
+指定内核等待1个或者多个事件的任何一个发生, 并且只在有它们发生之后或者等待一段时间后才唤醒进程。&lt;/p></description></item><item><title>Java NIO分析(2): I/O多路复用历史杂谈</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/</link><pubDate>Sun, 17 Jun 2018 09:32:06 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/</guid><description>&lt;p>前面&lt;a href="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/">Java-NIO分析-1-Unix网络模型&lt;/a>讲过5种经典I/O模型，
+现代企业的场景一般是&lt;strong>高并发高流量&lt;/strong>,&lt;strong>长连接&lt;/strong>, 假设硬件资源充足，如何提高应用单机能接受链接的上限?
+先讲段历史&lt;/p></description></item><item><title>Java NIO分析(1): Unix网络模型</title><link>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/</link><pubDate>Thu, 14 Jun 2018 11:12:00 +0800</pubDate><guid>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/</guid><description>&lt;p>要谈Java的NIO, 还是先从I/O开始说起。
+Unix提供了5种不同的I/O模型，分别是&lt;/p>
+&lt;ul>
+&lt;li>阻塞I/O(blocking I/O)&lt;/li>
+&lt;li>非阻塞I/O(non-blocking I/O)&lt;/li>
+&lt;li>I/O复用(I/O multiplexing)&lt;/li>
+&lt;li>信号驱动式I/O(signal-driven I/O)&lt;/li>
+&lt;li>异步I/O(asynchronous I/O)&lt;/li>
+&lt;/ul></description></item><item><title>luminus整合shadow-cljs打包</title><link>http://sound2gd.wang/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/</link><pubDate>Wed, 21 Mar 2018 22:51:59 +0800</pubDate><guid>http://sound2gd.wang/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/</guid><description>&lt;p>&lt;a href="https://github.com/thheller/shadow-cljs">shadow-cljs&lt;/a>是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:&lt;/p>
+&lt;ol>
+&lt;li>支持直接引用npm依赖, 以前还需要使用&lt;code>cljsjs&lt;/code>转一次，不仅麻烦而且还是过时的&lt;/li>
+&lt;li>和webpack类似的代码分割, 依赖&lt;/li>
+&lt;/ol>
+&lt;p>当然，&lt;strong>cljs+css代码重载&lt;/strong>是最基本的，而且构建速度也足够快&lt;/p></description></item><item><title>使用clj1.9快速启动clojure的repl</title><link>http://sound2gd.wang/post/%E4%BD%BF%E7%94%A8clj1.9%E5%BF%AB%E9%80%9F%E5%90%AF%E5%8A%A8clojure%E7%9A%84repl/</link><pubDate>Fri, 15 Dec 2017 00:00:00 +0000</pubDate><guid>http://sound2gd.wang/post/%E4%BD%BF%E7%94%A8clj1.9%E5%BF%AB%E9%80%9F%E5%90%AF%E5%8A%A8clojure%E7%9A%84repl/</guid><description>&lt;p>随着&lt;a href="https://clojure.org/news/2017/12/08/clojure19">Clojure1.9&lt;/a>的发布，给我们带来了spec和命令行的支持.
+mac下通过&lt;a href="https://brew.sh">HomeBrew&lt;/a>可以快速安装最新版clojure,自带clj命令行工具&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">&lt;code>&lt;span style="margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">&lt;code class="language-sh" data-lang="sh">brew install clojure
+&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>linux平台按照&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">&lt;code>&lt;span style="margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4">&lt;code class="language-sh" data-lang="sh">curl -O https://download.clojure.org/install/linux-install.sh
+chmod +x linux-install.sh
+sudo ./linux-install.sh
+&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>然后通过&lt;code>clj&lt;/code>命令就可以快速启动clj的repl.
+原来用&lt;code>lein repl&lt;/code>和&lt;code>boot repl&lt;/code>启动需要1分钟，&lt;code>clj&lt;/code>命令启动只需要短短的几秒。&lt;/p></description></item></channel></rss>

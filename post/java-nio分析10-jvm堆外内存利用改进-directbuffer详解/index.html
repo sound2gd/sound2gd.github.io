@@ -1,0 +1,821 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解 | Chris的博客</title>
+<meta property="og:title" content="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解 - Chris的博客">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-07-21T23:45:47+08:00">
+<meta property="article:modified_time" content="2018-07-21T23:45:47+08:00">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a class=current href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<article class=post>
+<header>
+<h1 class=post-title>Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</h1>
+</header>
+<date class="post-meta meta-date">
+2018年7月21日
+</date>
+<div class=post-content>
+<p>前面我们详细讲了<a href=/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/>Java-NIO分析-8-Selector详解</a>和<a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java-NIO分析-9-从BSD-socket到SocketChannel</a>, 分别是NIO的事件分发器和非阻塞处理器.</p>
+<p>为了支持<code>Channel</code>的双向读写和<code>Scatter/Gather</code>操作，我们还需要<code>Buffer</code>,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解.</p>
+<p>接下来我们聊聊JVM使用堆外内存的沧桑历史以及为什么要设计出<code>DirectBuffer</code>。</p>
+<p>首先我们要从没有NIO的前JDK1.4时代开始说起，那会儿大家使用的是<code>SocketInputStream</code>和<code>SocketOutputStream</code>.</p>
+<h1 id=1-java传统的socket是如何收发数据的>1. Java传统的Socket是如何收发数据的?</h1>
+<p>以<code>SocketOutputStream</code>为例，继承类图如下：</p>
+<p>
+<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/22/20180722092445.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/22/20180722092445.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+</a>
+</p>
+<p>其实大家应该比较熟悉，<code>java.io</code>包里最根本的抽象就是<code>InputStream</code>和<code>OutputStream</code>,其余的类抽象和实现都是一堆<strong>装饰器</strong>。
+所以我们要跟踪的就是<code>write方法</code></p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#998;font-style:italic>// java.io.SocketOutputStream
+</span><span style=color:#998;font-style:italic></span><span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>write</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>byte</span> b<span style=color:#000;font-weight:700>[],</span> <span style=color:#458;font-weight:700>int</span> off<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>int</span> len<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> IOException <span style=color:#000;font-weight:700>{</span>
+    <span style=color:#998;font-style:italic>// 委托给本类的socketWrite方法
+</span><span style=color:#998;font-style:italic></span>    socketWrite<span style=color:#000;font-weight:700>(</span>b<span style=color:#000;font-weight:700>,</span> off<span style=color:#000;font-weight:700>,</span> len<span style=color:#000;font-weight:700>);</span>
+<span style=color:#000;font-weight:700>}</span>
+
+    <span style=color:#998;font-style:italic>/**
+</span><span style=color:#998;font-style:italic>     * Writes to the socket with appropriate locking of the
+</span><span style=color:#998;font-style:italic>     * FileDescriptor.
+</span><span style=color:#998;font-style:italic>     * @param b the data to be written
+</span><span style=color:#998;font-style:italic>     * @param off the start offset in the data
+</span><span style=color:#998;font-style:italic>     * @param len the number of bytes that are written
+</span><span style=color:#998;font-style:italic>     * @exception IOException If an I/O error has occurred.
+</span><span style=color:#998;font-style:italic>     */</span>
+<span style=color:#000;font-weight:700>private</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>socketWrite</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>byte</span> b<span style=color:#000;font-weight:700>[],</span> <span style=color:#458;font-weight:700>int</span> off<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>int</span> len<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> IOException <span style=color:#000;font-weight:700>{</span>
+    <span style=color:#000;font-weight:700>...</span><span style=color:teal>省略非关键代码</span>
+    FileDescriptor fd <span style=color:#000;font-weight:700>=</span> impl<span style=color:#000;font-weight:700>.</span><span style=color:teal>acquireFD</span><span style=color:#000;font-weight:700>();</span>
+    <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#998;font-style:italic>// 上面就是做了一些参数判断，然后委托给socketWrite0
+</span><span style=color:#998;font-style:italic></span>        socketWrite0<span style=color:#000;font-weight:700>(</span>fd<span style=color:#000;font-weight:700>,</span> b<span style=color:#000;font-weight:700>,</span> off<span style=color:#000;font-weight:700>,</span> len<span style=color:#000;font-weight:700>);</span>
+    <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>SocketException se<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+    <span style=color:#000;font-weight:700>...</span>
+    <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>finally</span> <span style=color:#000;font-weight:700>{</span>
+        impl<span style=color:#000;font-weight:700>.</span><span style=color:teal>releaseFD</span><span style=color:#000;font-weight:700>();</span>
+    <span style=color:#000;font-weight:700>}</span>
+<span style=color:#000;font-weight:700>}</span>
+
+    <span style=color:#998;font-style:italic>/**
+</span><span style=color:#998;font-style:italic>     * Writes to the socket.
+</span><span style=color:#998;font-style:italic>     * @param fd the FileDescriptor
+</span><span style=color:#998;font-style:italic>     * @param b the data to be written
+</span><span style=color:#998;font-style:italic>     * @param off the start offset in the data
+</span><span style=color:#998;font-style:italic>     * @param len the number of bytes that are written
+</span><span style=color:#998;font-style:italic>     * @exception IOException If an I/O error has occurred.
+</span><span style=color:#998;font-style:italic>     */</span>
+<span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>native</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>socketWrite0</span><span style=color:#000;font-weight:700>(</span>FileDescriptor fd<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>byte</span><span style=color:#000;font-weight:700>[]</span> b<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>int</span> off<span style=color:#000;font-weight:700>,</span>
+                                 <span style=color:#458;font-weight:700>int</span> len<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> IOException<span style=color:#000;font-weight:700>;</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>最后调用的是一个native方法<code>socketWrite0</code>,打开<code>jdk/src/solaris/native/java/net/SocketOutputStream.c</code></p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">65
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">66
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">67
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">68
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">69
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">70
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">71
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">72
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">73
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">74
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">75
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">76
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">77
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">78
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">79
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">80
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">81
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">82
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">83
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">84
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=color:#998;font-style:italic>/*
+</span><span style=color:#998;font-style:italic> * Class:     java_net_SocketOutputStream
+</span><span style=color:#998;font-style:italic> * Method:    socketWrite0
+</span><span style=color:#998;font-style:italic> * Signature: (Ljava/io/FileDescriptor;[BII)V
+</span><span style=color:#998;font-style:italic> */</span>
+JNIEXPORT <span style=color:#458;font-weight:700>void</span> JNICALL
+<span style=color:#900;font-weight:700>Java_java_net_SocketOutputStream_socketWrite0</span>(JNIEnv <span style=color:#000;font-weight:700>*</span>env, jobject this,
+                                              jobject fdObj,
+                                              jbyteArray data,
+                                              jint off, jint len) {
+    <span style=color:#458;font-weight:700>char</span> <span style=color:#000;font-weight:700>*</span>bufP;
+    <span style=color:#458;font-weight:700>char</span> BUF[MAX_BUFFER_LEN];
+    <span style=color:#458;font-weight:700>int</span> buflen;
+    <span style=color:#458;font-weight:700>int</span> fd;
+
+    <span style=color:#000;font-weight:700>if</span> (IS_NULL(fdObj)) {
+        JNU_ThrowByName(env, <span style=color:#d14>&#34;java/net/SocketException&#34;</span>, <span style=color:#d14>&#34;Socket closed&#34;</span>);
+        <span style=color:#000;font-weight:700>return</span>;
+    } <span style=color:#000;font-weight:700>else</span> {
+        fd <span style=color:#000;font-weight:700>=</span> (<span style=color:#000;font-weight:700>*</span>env)<span style=color:#000;font-weight:700>-&gt;</span>GetIntField(env, fdObj, IO_fd_fdID);
+        <span style=color:#998;font-style:italic>/* Bug 4086704 - If the Socket associated with this file descriptor
+</span><span style=color:#998;font-style:italic>         * was closed (sysCloseFD), the the file descriptor is set to -1.
+</span><span style=color:#998;font-style:italic>         */</span>
+        <span style=color:#000;font-weight:700>if</span> (fd <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>-</span><span style=color:#099>1</span>) {
+            JNU_ThrowByName(env, <span style=color:#d14>&#34;java/net/SocketException&#34;</span>, <span style=color:#d14>&#34;Socket closed&#34;</span>);
+            <span style=color:#000;font-weight:700>return</span>;
+        }
+
+    }
+
+    <span style=color:#000;font-weight:700>if</span> (len <span style=color:#000;font-weight:700>&lt;=</span> MAX_BUFFER_LEN) {
+        bufP <span style=color:#000;font-weight:700>=</span> BUF;
+        buflen <span style=color:#000;font-weight:700>=</span> MAX_BUFFER_LEN;
+    } <span style=color:#000;font-weight:700>else</span> {
+        buflen <span style=color:#000;font-weight:700>=</span> min(MAX_HEAP_BUFFER_LEN, len);
+        <span style=color:#998;font-style:italic>// 初始化一块直接内存
+</span><span style=color:#998;font-style:italic></span>        bufP <span style=color:#000;font-weight:700>=</span> (<span style=color:#458;font-weight:700>char</span> <span style=color:#000;font-weight:700>*</span>)malloc((size_t)buflen);
+
+        <span style=color:#998;font-style:italic>/* if heap exhausted resort to stack buffer */</span>
+        <span style=color:#000;font-weight:700>if</span> (bufP <span style=color:#000;font-weight:700>==</span> <span style=color:#0086b3>NULL</span>) {
+            bufP <span style=color:#000;font-weight:700>=</span> BUF;
+            buflen <span style=color:#000;font-weight:700>=</span> MAX_BUFFER_LEN;
+        }
+    }
+
+    <span style=color:#000;font-weight:700>while</span>(len <span style=color:#000;font-weight:700>&gt;</span> <span style=color:#099>0</span>) {
+        <span style=color:#458;font-weight:700>int</span> loff <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+        <span style=color:#458;font-weight:700>int</span> chunkLen <span style=color:#000;font-weight:700>=</span> min(buflen, len);
+        <span style=color:#458;font-weight:700>int</span> llen <span style=color:#000;font-weight:700>=</span> chunkLen;
+        <span style=color:#998;font-style:italic>// 将堆内的data复制到刚才初始化的内存bufP里
+</span><span style=color:#998;font-style:italic></span>        (<span style=color:#000;font-weight:700>*</span>env)<span style=color:#000;font-weight:700>-&gt;</span>GetByteArrayRegion(env, data, off, chunkLen, (jbyte <span style=color:#000;font-weight:700>*</span>)bufP);
+
+        <span style=color:#000;font-weight:700>while</span>(llen <span style=color:#000;font-weight:700>&gt;</span> <span style=color:#099>0</span>) {
+            <span style=color:#998;font-style:italic>// 发送数据
+</span><span style=color:#998;font-style:italic></span>            <span style=color:#458;font-weight:700>int</span> n <span style=color:#000;font-weight:700>=</span> NET_Send(fd, bufP <span style=color:#000;font-weight:700>+</span> loff, llen, <span style=color:#099>0</span>);
+            <span style=color:#000;font-weight:700>if</span> (n <span style=color:#000;font-weight:700>&gt;</span> <span style=color:#099>0</span>) {
+                llen <span style=color:#000;font-weight:700>-=</span> n;
+                loff <span style=color:#000;font-weight:700>+=</span> n;
+                <span style=color:#000;font-weight:700>continue</span>;
+            }
+            <span style=color:#000;font-weight:700>if</span> (n <span style=color:#000;font-weight:700>==</span> JVM_IO_INTR) {
+                JNU_ThrowByName(env, <span style=color:#d14>&#34;java/io/InterruptedIOException&#34;</span>, <span style=color:#099>0</span>);
+            } <span style=color:#000;font-weight:700>else</span> {
+                <span style=color:#000;font-weight:700>if</span> (errno <span style=color:#000;font-weight:700>==</span> ECONNRESET) {
+                    JNU_ThrowByName(env, <span style=color:#d14>&#34;sun/net/ConnectionResetException&#34;</span>,
+                        <span style=color:#d14>&#34;Connection reset&#34;</span>);
+                } <span style=color:#000;font-weight:700>else</span> {
+                    NET_ThrowByNameWithLastError(env, <span style=color:#d14>&#34;java/net/SocketException&#34;</span>,
+                        <span style=color:#d14>&#34;Write failed&#34;</span>);
+                }
+            }
+            <span style=color:#000;font-weight:700>if</span> (bufP <span style=color:#000;font-weight:700>!=</span> BUF) {
+                free(bufP);
+            }
+            <span style=color:#000;font-weight:700>return</span>;
+        }
+        len <span style=color:#000;font-weight:700>-=</span> chunkLen;
+        off <span style=color:#000;font-weight:700>+=</span> chunkLen;
+    }
+
+    <span style=color:#000;font-weight:700>if</span> (bufP <span style=color:#000;font-weight:700>!=</span> BUF) {
+        free(bufP);
+    }
+}
+</code></pre></td></tr></table>
+</div>
+</div><p>这段比较短，就没有省略代码了。
+大致分3步:</p>
+<ol>
+<li>申请一块直接内存bufP, 长度为len</li>
+<li>将堆内的data复制到刚才初始化的内存bufP里</li>
+<li>调用Net_send函数发送数据</li>
+</ol>
+<p><code>Net_send</code>是一个宏，定义在<code>net_util_md.h</code>里</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=color:#998;font-style:italic>// net_util_md.h
+</span><span style=color:#998;font-style:italic></span><span style=color:#999;font-weight:700;font-style:italic>#define NET_Send        JVM_Send
+</span><span style=color:#999;font-weight:700;font-style:italic></span>
+<span style=color:#998;font-style:italic>// jvm.cpp
+</span><span style=color:#998;font-style:italic></span>JVM_LEAF(jint, JVM_Send(jint fd, <span style=color:#458;font-weight:700>char</span> <span style=color:#000;font-weight:700>*</span>buf, jint nBytes, jint flags))
+  JVMWrapper2(<span style=color:#d14>&#34;JVM_Send (0x%x)&#34;</span>, fd);
+  <span style=color:#998;font-style:italic>//%note jvm_r6
+</span><span style=color:#998;font-style:italic></span>  <span style=color:#000;font-weight:700>return</span> os<span style=color:#000;font-weight:700>::</span>send(fd, buf, (size_t)nBytes, (uint)flags);
+JVM_END
+
+<span style=color:#998;font-style:italic>// os_linux.inline.hpp
+</span><span style=color:#998;font-style:italic></span><span style=color:#000;font-weight:700>inline</span> <span style=color:#458;font-weight:700>int</span> os<span style=color:#000;font-weight:700>::</span>send(<span style=color:#458;font-weight:700>int</span> fd, <span style=color:#458;font-weight:700>char</span><span style=color:#000;font-weight:700>*</span> buf, size_t nBytes, uint flags) {
+  RESTARTABLE_RETURN_INT(<span style=color:#000;font-weight:700>::</span>send(fd, buf, nBytes, flags));
+}
+</code></pre></td></tr></table>
+</div>
+</div><p>这个宏替换的是<code>JVM_Send</code>,是一个cpp封装方法，最后会调用<code>os::send</code>,这个在<code>os_linux.inline.hpp</code>里，可以看到，最后调用的是一个全局函数<code>send</code>。</p>
+<p><code>send</code>是我们的老朋友了，属于POSIX的标准<code>Socket API</code>, 如果你在类Unix系统上，都可以通过<code>man send</code>来翻看它的文档。它的函数签名如下：</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;sys/socket.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic></span>
+ ssize_t
+ <span style=color:#900;font-weight:700>send</span>(<span style=color:#458;font-weight:700>int</span> socket, <span style=color:#000;font-weight:700>const</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#000;font-weight:700>*</span>buffer, size_t length, <span style=color:#458;font-weight:700>int</span> flags);
+</code></pre></td></tr></table>
+</div>
+</div><p>这个函数用来将首地址为buffer, 长度为length的数据发送到<code>socket fd</code>.</p>
+<p>
+<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/22/20180722095054.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/22/20180722095054.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+</a>
+</p>
+<p>所以传统的Java Socket编程每次发送数据的时候，都会申请一块直接内存(堆外)，然后从堆内复制到堆外，最后在调用send发送</p>
+<p>为什么要把数据从堆内复制到堆外呢？因为<strong>堆内的对象地址会随着gc改变，在send的时候会崩</strong>。</p>
+<p>在高并发场景下，这是非常费内存的，假如每个链接发送的数据是1k, 那么堆内有1K的数据，堆外还要申请1K的数据，还要做数据拷贝，百万链接就需要2T的内存(极端场景), 无疑是瓶颈之一。</p>
+<h1 id=2-nio的解决方案-directbuffer>2. NIO的解决方案: DirectBuffer</h1>
+<p>既然Socket Api一定要用堆外的内存，一个解决思路就是<strong>复用这块内存</strong>，这样就<strong>不必每次都申请一块新的内存，减少系统调用损耗</strong>。</p>
+<p><strong>计算机世界就是解决一个问题的同时带来新的问题</strong>，如果复用了这块内存，如何在不用的时候进行回收就是一个问题了，因为这块<strong>内存在堆外，JVM的gc管不到</strong>,放着不管又迟早触发Linux的<code>OOM Killer</code>.</p>
+<p>jdk1.4以后的NIO带来了解决方案: <code>DirectBuffer</code></p>
+<h2 id=21-directbuffer>2.1 DirectBuffer</h2>
+<p>JVM堆内的对象是带gc的，那么将JVM堆内的对象关联到堆外，在回收堆内对象的时候触发一个回收堆外内存的操作，就可以解决这个问题了。</p>
+<p>这个设计思路的常用实现就是<code>DirectByteBuffer</code>, 打开其代码</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java>
+    <span style=color:#998;font-style:italic>// Primary constructor
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#998;font-style:italic>//
+</span><span style=color:#998;font-style:italic></span>    DirectByteBuffer<span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>int</span> cap<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>                   <span style=color:#998;font-style:italic>// package-private
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#000;font-weight:700>super</span><span style=color:#000;font-weight:700>(-</span>1<span style=color:#000;font-weight:700>,</span> 0<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#458;font-weight:700>boolean</span> pa <span style=color:#000;font-weight:700>=</span> VM<span style=color:#000;font-weight:700>.</span><span style=color:teal>isDirectMemoryPageAligned</span><span style=color:#000;font-weight:700>();</span>
+        <span style=color:#458;font-weight:700>int</span> ps <span style=color:#000;font-weight:700>=</span> Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>pageSize</span><span style=color:#000;font-weight:700>();</span>
+        <span style=color:#458;font-weight:700>long</span> size <span style=color:#000;font-weight:700>=</span> Math<span style=color:#000;font-weight:700>.</span><span style=color:teal>max</span><span style=color:#000;font-weight:700>(</span>1L<span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>long</span><span style=color:#000;font-weight:700>)</span>cap <span style=color:#000;font-weight:700>+</span> <span style=color:#000;font-weight:700>(</span>pa <span style=color:#000;font-weight:700>?</span> ps <span style=color:#000;font-weight:700>:</span> 0<span style=color:#000;font-weight:700>));</span>
+        <span style=color:#998;font-style:italic>// 主要是记录jdk已经使用的直接内存的数量，当分配直接内存时，需要进行增加，当释放时，需要减少
+</span><span style=color:#998;font-style:italic></span>        Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>reserveMemory</span><span style=color:#000;font-weight:700>(</span>size<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>);</span>
+
+        <span style=color:#458;font-weight:700>long</span> base <span style=color:#000;font-weight:700>=</span> 0<span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#998;font-style:italic>// 分配直接内存
+</span><span style=color:#998;font-style:italic></span>            base <span style=color:#000;font-weight:700>=</span> unsafe<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocateMemory</span><span style=color:#000;font-weight:700>(</span>size<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>OutOfMemoryError x<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+            Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>unreserveMemory</span><span style=color:#000;font-weight:700>(</span>size<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>);</span>
+            <span style=color:#000;font-weight:700>throw</span> x<span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#998;font-style:italic>// 内存清零
+</span><span style=color:#998;font-style:italic></span>        unsafe<span style=color:#000;font-weight:700>.</span><span style=color:teal>setMemory</span><span style=color:#000;font-weight:700>(</span>base<span style=color:#000;font-weight:700>,</span> size<span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>byte</span><span style=color:#000;font-weight:700>)</span> 0<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>pa <span style=color:#000;font-weight:700>&amp;&amp;</span> <span style=color:#000;font-weight:700>(</span>base <span style=color:#000;font-weight:700>%</span> ps <span style=color:#000;font-weight:700>!=</span> 0<span style=color:#000;font-weight:700>))</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#998;font-style:italic>// Round up to page boundary
+</span><span style=color:#998;font-style:italic></span>            address <span style=color:#000;font-weight:700>=</span> base <span style=color:#000;font-weight:700>+</span> ps <span style=color:#000;font-weight:700>-</span> <span style=color:#000;font-weight:700>(</span>base <span style=color:#000;font-weight:700>&amp;</span> <span style=color:#000;font-weight:700>(</span>ps <span style=color:#000;font-weight:700>-</span> 1<span style=color:#000;font-weight:700>));</span>
+        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>{</span>
+            address <span style=color:#000;font-weight:700>=</span> base<span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#998;font-style:italic>// 创建Cleaner对象
+</span><span style=color:#998;font-style:italic></span>        cleaner <span style=color:#000;font-weight:700>=</span> Cleaner<span style=color:#000;font-weight:700>.</span><span style=color:teal>create</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>new</span> Deallocator<span style=color:#000;font-weight:700>(</span>base<span style=color:#000;font-weight:700>,</span> size<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>));</span>
+        att <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>}</span>
+    
+    <span style=color:#000;font-weight:700>private</span> ByteBuffer <span style=color:#900;font-weight:700>putShort</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>long</span> a<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>short</span> x<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>unaligned<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#458;font-weight:700>short</span> y <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>(</span>x<span style=color:#000;font-weight:700>);</span>
+            unsafe<span style=color:#000;font-weight:700>.</span><span style=color:teal>putShort</span><span style=color:#000;font-weight:700>(</span>a<span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>(</span>nativeByteOrder <span style=color:#000;font-weight:700>?</span> y <span style=color:#000;font-weight:700>:</span> Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>swap</span><span style=color:#000;font-weight:700>(</span>y<span style=color:#000;font-weight:700>)));</span>
+        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>{</span>
+            Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>putShort</span><span style=color:#000;font-weight:700>(</span>a<span style=color:#000;font-weight:700>,</span> x<span style=color:#000;font-weight:700>,</span> bigEndian<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#000;font-weight:700>return</span> <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>}</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>在构造器里就会申请一块直接内存，大小就是<code>ByteBuffer.allocateDirect</code>的时候指定的。</p>
+<p>在调用<code>DirectByteBuffer</code>的<code>PutXXX</code>的时候，都是写入到这块直接内存的，无需再去<code>malloc</code>.</p>
+<p>所以<code>SocketChannel</code>使用<code>DirectBuffer</code>进行读写的时候，性能远比<code>SocketOutputStream</code>高，需要的内存也没有它多, 对<code>SocketChannel</code>有疑问的可以看看前面分析的<a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java-NIO分析-9-从BSD-socket到SocketChannel</a></p>
+<h2 id=22--何时回收直接内存>2.2 何时回收直接内存?</h2>
+<p>上面的构造器最后一行是使用了<code>Cleaner</code>对象, 这个类是个<code>虚引用</code>类,继承自<code>PhantomReference</code>.</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#998;font-style:italic>// 创建Cleaner对象
+</span><span style=color:#998;font-style:italic></span>cleaner <span style=color:#000;font-weight:700>=</span> Cleaner<span style=color:#000;font-weight:700>.</span><span style=color:teal>create</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>,</span>
+        <span style=color:#000;font-weight:700>new</span> Deallocator<span style=color:#000;font-weight:700>(</span>base<span style=color:#000;font-weight:700>,</span> size<span style=color:#000;font-weight:700>,</span> cap<span style=color:#000;font-weight:700>));</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>create第一个参数是要观察的引用，第二个参数是引用被回收触发的操作。</p>
+<p>在JVM中，虚引用是为了实现<strong>更细粒度的内存控制的手段</strong>，在创建虚引用的时候必须传入一个<strong>引用队列(ReferenceQueue)</strong>，在一个对象的finalize函数被调用之后，这个对象的虚引用会被加入<strong>引用队列</strong>, 通过检查队列就可以知道对象是不是要被回收了。</p>
+<p><code>sun.misc.Cleaner</code>就是一个自带<code>ReferenceQueue</code>的类, 在<code>create</code>的时候会将<code>DirectBuffer</code>的引用加入观察，一旦引用被回收，JVM将会通知Cleaner去执行回收操作。</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>Cleaner</span>
+    <span style=color:#000;font-weight:700>extends</span> PhantomReference<span style=color:#000;font-weight:700>&lt;</span>Object<span style=color:#000;font-weight:700>&gt;</span>
+<span style=color:#000;font-weight:700>{</span>
+
+    <span style=color:#998;font-style:italic>// 引用队列
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#000;font-weight:700>final</span> ReferenceQueue<span style=color:#000;font-weight:700>&lt;</span>Object<span style=color:#000;font-weight:700>&gt;</span> dummyQueue <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> ReferenceQueue<span style=color:#000;font-weight:700>&lt;&gt;();</span>
+
+    <span style=color:#000;font-weight:700>...</span>
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#900;font-weight:700>Cleaner</span><span style=color:#000;font-weight:700>(</span>Object referent<span style=color:#000;font-weight:700>,</span> Runnable thunk<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#000;font-weight:700>super</span><span style=color:#000;font-weight:700>(</span>referent<span style=color:#000;font-weight:700>,</span> dummyQueue<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>thunk</span> <span style=color:#000;font-weight:700>=</span> thunk<span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>}</span>
+    <span style=color:#000;font-weight:700>...</span>
+<span style=color:#000;font-weight:700>}</span>
+</code></pre></td></tr></table>
+</div>
+</div><h2 id=23-如何回收直接内存>2.3 如何回收直接内存?</h2>
+<p>在<code>DirectBuffer</code>中有个内部类<code>Deallocator</code></p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>Deallocator</span>
+    <span style=color:#000;font-weight:700>implements</span> Runnable
+<span style=color:#000;font-weight:700>{</span>
+
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>static</span> Unsafe unsafe <span style=color:#000;font-weight:700>=</span> Unsafe<span style=color:#000;font-weight:700>.</span><span style=color:teal>getUnsafe</span><span style=color:#000;font-weight:700>();</span>
+
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#458;font-weight:700>long</span> address<span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#458;font-weight:700>long</span> size<span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#458;font-weight:700>int</span> capacity<span style=color:#000;font-weight:700>;</span>
+
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#900;font-weight:700>Deallocator</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>long</span> address<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> size<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>int</span> capacity<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#000;font-weight:700>assert</span> <span style=color:#000;font-weight:700>(</span>address <span style=color:#000;font-weight:700>!=</span> 0<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>address</span> <span style=color:#000;font-weight:700>=</span> address<span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>size</span> <span style=color:#000;font-weight:700>=</span> size<span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>capacity</span> <span style=color:#000;font-weight:700>=</span> capacity<span style=color:#000;font-weight:700>;</span>
+    <span style=color:#000;font-weight:700>}</span>
+
+    <span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>run</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>address <span style=color:#000;font-weight:700>==</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#998;font-style:italic>// Paranoia
+</span><span style=color:#998;font-style:italic></span>            <span style=color:#000;font-weight:700>return</span><span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#998;font-style:italic>// 调用unsafe释放内存
+</span><span style=color:#998;font-style:italic></span>        unsafe<span style=color:#000;font-weight:700>.</span><span style=color:teal>freeMemory</span><span style=color:#000;font-weight:700>(</span>address<span style=color:#000;font-weight:700>);</span>
+        address <span style=color:#000;font-weight:700>=</span> 0<span style=color:#000;font-weight:700>;</span>
+        Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>unreserveMemory</span><span style=color:#000;font-weight:700>(</span>size<span style=color:#000;font-weight:700>,</span> capacity<span style=color:#000;font-weight:700>);</span>
+    <span style=color:#000;font-weight:700>}</span>
+<span style=color:#000;font-weight:700>}</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>在回收的时候调用其run方法，可以看到就是调用<code>sun.misc.unsafe</code>去释放的。这里提下,unsafe类里都是静态native方法，其实就是堆大家常用的各种<code>free</code>,<code>malloc</code>这样的内存操作函数的封装，因为java不能操作直接内存。</p>
+<h2 id=one-more-thing>One more thing</h2>
+<p>构造<code>DirectBuffer</code>的时候，有一行<code>Bits.reserveMemory</code>, 功能主要是记录jdk已经使用的直接内存的数量, but会判断有没有足够多的直接内存使用，如果内存不够，会触发gc..</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#998;font-style:italic>// These methods should be called whenever direct memory is allocated or
+</span><span style=color:#998;font-style:italic>// freed.  They allow the user to control the amount of direct memory
+</span><span style=color:#998;font-style:italic>// which a process may access.  All sizes are specified in bytes.
+</span><span style=color:#998;font-style:italic></span><span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>reserveMemory</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>long</span> size<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>int</span> cap<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+    <span style=color:#000;font-weight:700>synchronized</span> <span style=color:#000;font-weight:700>(</span>Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>class</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#998;font-style:italic>// 判断内存够不够， 够的话直接增加内存引用的计数
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(!</span>memoryLimitSet <span style=color:#000;font-weight:700>&amp;&amp;</span> VM<span style=color:#000;font-weight:700>.</span><span style=color:teal>isBooted</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+            maxMemory <span style=color:#000;font-weight:700>=</span> VM<span style=color:#000;font-weight:700>.</span><span style=color:teal>maxDirectMemory</span><span style=color:#000;font-weight:700>();</span>
+            memoryLimitSet <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>true</span><span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#998;font-style:italic>// -XX:MaxDirectMemorySize limits the total capacity rather than the
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#998;font-style:italic>// actual memory usage, which will differ when buffers are page
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#998;font-style:italic>// aligned.
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>cap <span style=color:#000;font-weight:700>&lt;=</span> maxMemory <span style=color:#000;font-weight:700>-</span> totalCapacity<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+            reservedMemory <span style=color:#000;font-weight:700>+=</span> size<span style=color:#000;font-weight:700>;</span>
+            totalCapacity <span style=color:#000;font-weight:700>+=</span> cap<span style=color:#000;font-weight:700>;</span>
+            count<span style=color:#000;font-weight:700>++;</span>
+            <span style=color:#000;font-weight:700>return</span><span style=color:#000;font-weight:700>;</span>
+        <span style=color:#000;font-weight:700>}</span>
+    <span style=color:#000;font-weight:700>}</span>
+
+    <span style=color:#998;font-style:italic>// 内存不够就去建议JVM gc了。。
+</span><span style=color:#998;font-style:italic></span>    System<span style=color:#000;font-weight:700>.</span><span style=color:teal>gc</span><span style=color:#000;font-weight:700>();</span>
+    <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#998;font-style:italic>// 等待垃圾回收
+</span><span style=color:#998;font-style:italic></span>        Thread<span style=color:#000;font-weight:700>.</span><span style=color:teal>sleep</span><span style=color:#000;font-weight:700>(</span>100<span style=color:#000;font-weight:700>);</span>
+    <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>InterruptedException x<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#998;font-style:italic>// Restore interrupt status
+</span><span style=color:#998;font-style:italic></span>        Thread<span style=color:#000;font-weight:700>.</span><span style=color:teal>currentThread</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>interrupt</span><span style=color:#000;font-weight:700>();</span>
+    <span style=color:#000;font-weight:700>}</span>
+    <span style=color:#000;font-weight:700>synchronized</span> <span style=color:#000;font-weight:700>(</span>Bits<span style=color:#000;font-weight:700>.</span><span style=color:teal>class</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+        <span style=color:#998;font-style:italic>// 增加直接内存的计数
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>totalCapacity <span style=color:#000;font-weight:700>+</span> cap <span style=color:#000;font-weight:700>&gt;</span> maxMemory<span style=color:#000;font-weight:700>)</span>
+            <span style=color:#000;font-weight:700>throw</span> <span style=color:#000;font-weight:700>new</span> OutOfMemoryError<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;Direct buffer memory&#34;</span><span style=color:#000;font-weight:700>);</span>
+        reservedMemory <span style=color:#000;font-weight:700>+=</span> size<span style=color:#000;font-weight:700>;</span>
+        totalCapacity <span style=color:#000;font-weight:700>+=</span> cap<span style=color:#000;font-weight:700>;</span>
+        count<span style=color:#000;font-weight:700>++;</span>
+    <span style=color:#000;font-weight:700>}</span>
+
+<span style=color:#000;font-weight:700>}</span>
+</code></pre></td></tr></table>
+</div>
+</div><h1 id=3-总结>3. 总结</h1>
+<p>本文从<code>SocketStream</code>开始讲起，分析了祖传BIO里Socket的内存缺陷和性能瓶颈:</p>
+<ol>
+<li><strong>每次发送都需要<code>malloc</code>一块新直接内存，</strong></li>
+<li><strong>要将数据从堆内copy到堆外,然后再send</strong>.</li>
+</ol>
+<p>然后介绍了NIO的对堆外内存改进&ndash;即<strong>复用堆外内存</strong>, 以及复用堆外内存引出的堆外内存回收问题， 并从源码层面解读了其如何创建和回收。NIO的改进只是针对1，但是对2没改进，没准儿这是java吃内存的原因之一。</p>
+<p><code>DirectBuffer</code>是我们常用的<code>冰山对象</code>，使用的时候要慎重，如果该对象在年轻代, 容易gc, 回收的时候直接内存可以被释放掉。但是在存活了几次gc之后，被移入年老代，就不容易gc了。 其所关联的直接内存也不会被释放。</p>
+<p>这也是常见的一个内存泄漏原因，看JVM堆内没用多少内存，但是机器上内存所剩无几，还频繁gc, 频繁触发<code>OOM Killer</code>, 希望看完本文大家能意识到问题出在哪 :)</p>
+</div>
+<div class=post-archive>
+<ul class=post-copyright>
+<li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li>
+<li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/</a></li>
+<li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li>
+</ul>
+</div>
+<br>
+<div class=post-archive>
+<h2>See Also</h2>
+<ul class=listing>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java NIO分析(9): 从BSD socket到SocketChannel</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/>Java NIO分析(8): 高并发核心Selector详解</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java NIO分析(6): 从BIO到NIO-设计和概念</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(5): I/O多路复用之epoll系统调用</a></li>
+</ul>
+</div>
+<div class="post-meta meta-tags">
+<ul class=clearfix>
+<li><a href=/tags/nio>NIO</a></li>
+</ul>
+</div>
+</article>
+<div class="post bg-white">
+<script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script>
+</div>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[['$','$']],processEscapes:!0}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

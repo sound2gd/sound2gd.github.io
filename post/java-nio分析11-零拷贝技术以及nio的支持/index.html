@@ -1,0 +1,527 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Java NIO分析(11): 零拷贝技术以及NIO的支持 | Chris的博客</title>
+<meta property="og:title" content="Java NIO分析(11): 零拷贝技术以及NIO的支持 - Chris的博客">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-07-24T16:44:47+08:00">
+<meta property="article:modified_time" content="2018-07-24T16:44:47+08:00">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="Java NIO分析(11): 零拷贝技术以及NIO的支持">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a class=current href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<article class=post>
+<header>
+<h1 class=post-title>Java NIO分析(11): 零拷贝技术以及NIO的支持</h1>
+</header>
+<date class="post-meta meta-date">
+2018年7月24日
+</date>
+<div class=post-content>
+<p>前面已经讲了<code>Selector</code>,<code>SocketChannel</code>和<code>DirectBuffer</code>, 这些是NIO网络编程中最核心的组件
+接下来我们会再讲几点非核心的优化(不代表不重要, 只是API不占NIO设计的大头):</p>
+<ul>
+<li>文件传输(File Transfer): 文件内容直接发送到网卡, 或者从网卡直接读到文件里</li>
+<li>内存映射文件(Memory-mapped Files): 将文件的一块映射到内存</li>
+</ul>
+<p>这两项本质上都基于<code>零拷贝(zero copy)</code>技术。</p>
+<h1 id=1-零拷贝>1. 零拷贝?</h1>
+<h2 id=11-简介>1.1 简介</h2>
+<blockquote>
+<p>零拷贝(Zero-Copy)是指计算机在执行操作时，CPU不需要先将数据从某处内存复制到一个特定区域，从而节省CPU时钟周期和内存带宽 &mdash;-维基百科</p>
+</blockquote>
+<p>拿常用的<strong>网络文件传输</strong>过程举个栗子:</p>
+<ol>
+<li><a href=https://zh.wikipedia.org/wiki/%E7%9B%B4%E6%8E%A5%E8%A8%98%E6%86%B6%E9%AB%94%E5%AD%98%E5%8F%96>DMA</a><code>read</code>读取磁盘文件内容到内核缓冲区</li>
+<li>copy内核缓冲区数据到应用进程缓冲区</li>
+<li>从应用进程缓冲区copy数据到socket缓冲区</li>
+<li><code>DMA copy</code>给网卡发送</li>
+</ol>
+<p>画个图:</p>
+<p>
+<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/24/20180724225945.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/24/20180724225945.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+</a>
+</p>
+<p>可以清楚得看到，有2次copy是没必要的, 就是上面的2和3，还会平白增加2次<strong>用户态和内核态上下文切换</strong>, 在高并发场景下，这些会很致命。</p>
+<h2 id=12-zero-copy分类>1.2 Zero-Copy分类</h2>
+<p>解决上面这个问题有几个思路</p>
+<ol>
+<li>直接I/O: 应用进程直接操作硬件存储</li>
+<li>避免在用户空间和内核空间地址之间拷贝数据</li>
+<li>优化<code>页缓存</code>和<code>应用进程缓冲区</code>的传输</li>
+</ol>
+<p>1和2都是<strong>避免应用程序地址空间和内核地址空间两者之间的缓冲区拷贝</strong>, 3是从传输的角度优化，因为DMA进行数据传输基本不需要CPU参与，但是用户地址空间的缓冲区和内核的<code>页缓存</code>传输没有类似DMA的手段, 3就是从这个角度优化。</p>
+<h2 id=13-linux的解决方案>1.3 Linux的解决方案</h2>
+<p><code>直接I/O</code>和<code>传输优化</code>都涉及到硬件层面我们暂且不讲，主要讲<code>避免上下文切换和数据来回拷贝</code>这个思路, Linux内核提供了</p>
+<ul>
+<li>mmap: 内存映射文件, 即将文件的一段直接映射到内存，内核和应用进程共用一块内存地址，这样就不需要拷贝了</li>
+<li>sendfile: 从上图的内核缓冲区直接复制到socket缓冲区, 不需要向应用进程缓冲区拷贝</li>
+</ul>
+<p>如图，<code>mmap</code>将buffer映射到了用户空间，操作的是同一块内存，也不需要切换了, 但是<code>mmap</code>有个缺点就是, 如果其他进程在向这个文件<code>write</code>, 那么会被认为是一个错误的存储访问</p>
+<p>
+<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/24/20180724234117.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/24/20180724234117.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+</a>
+</p>
+<p>而<code>sendfile</code>则<strong>没有映射</strong>, 保留了<code>mmap</code>的<strong>不需要来回拷贝</strong>优点，适用于应用进程不需要对读取的数据做任何处理的场景，如图:</p>
+<p>
+<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/24/20180724234610.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/24/20180724234610.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
+</a>
+</p>
+<p>2.6以后还提供了<code>splice</code>, splice可以在内核态将数据整块的从A复制到B地址。</p>
+<h1 id=2-nio中的零拷贝>2. NIO中的零拷贝</h1>
+<p>NIO中通过<code>FileChannel</code>来提供<code>Zero-Copy</code>的支持，分别是</p>
+<ul>
+<li>FileChannel.map: 将文件的一部分映射到内存</li>
+<li>FileChannel.transferTo: 将本Channel的文件字节转移到指定的可写Channel</li>
+</ul>
+<p><code>FileChannel.map</code>的基本用法如下:</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#998;font-style:italic>/**
+</span><span style=color:#998;font-style:italic> * 测试FileChannel的用法
+</span><span style=color:#998;font-style:italic> * 
+</span><span style=color:#998;font-style:italic> * @author sound2gd
+</span><span style=color:#998;font-style:italic> *
+</span><span style=color:#998;font-style:italic> */</span>
+<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>FileChannnelTest</span> <span style=color:#000;font-weight:700>{</span>
+
+	<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+		File file <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> File<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;src/com/cris/chapter15/f6/FileChannnelTest.java&#34;</span><span style=color:#000;font-weight:700>);</span>
+		<span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>(</span>
+				<span style=color:#998;font-style:italic>// FileInputStream打开的FileChannel只能读取
+</span><span style=color:#998;font-style:italic></span>				FileChannel fc <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> FileInputStream<span style=color:#000;font-weight:700>(</span>file<span style=color:#000;font-weight:700>).</span><span style=color:teal>getChannel</span><span style=color:#000;font-weight:700>();</span>
+				<span style=color:#998;font-style:italic>// FileOutputStream打开的FileChannel只能写入
+</span><span style=color:#998;font-style:italic></span>				FileChannel fo <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> FileOutputStream<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;src/com/cris/chapter15/f6/a.txt&#34;</span><span style=color:#000;font-weight:700>).</span><span style=color:teal>getChannel</span><span style=color:#000;font-weight:700>();)</span> <span style=color:#000;font-weight:700>{</span>
+
+			<span style=color:#998;font-style:italic>// 将FileChannel的数据全部映射成ByteBuffer
+</span><span style=color:#998;font-style:italic></span>			MappedByteBuffer mbb <span style=color:#000;font-weight:700>=</span> fc<span style=color:#000;font-weight:700>.</span><span style=color:teal>map</span><span style=color:#000;font-weight:700>(</span>MapMode<span style=color:#000;font-weight:700>.</span><span style=color:teal>READ_ONLY</span><span style=color:#000;font-weight:700>,</span> 0<span style=color:#000;font-weight:700>,</span> file<span style=color:#000;font-weight:700>.</span><span style=color:teal>length</span><span style=color:#000;font-weight:700>());</span>
+			<span style=color:#998;font-style:italic>// 使用UTF-8的字符集来创建解码器
+</span><span style=color:#998;font-style:italic></span>			Charset charset <span style=color:#000;font-weight:700>=</span> Charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>forName</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;UTF-8&#34;</span><span style=color:#000;font-weight:700>);</span>
+			<span style=color:#998;font-style:italic>// 直接将buffer里的数据全部输出
+</span><span style=color:#998;font-style:italic></span>			fo<span style=color:#000;font-weight:700>.</span><span style=color:teal>write</span><span style=color:#000;font-weight:700>(</span>mbb<span style=color:#000;font-weight:700>);</span>
+			mbb<span style=color:#000;font-weight:700>.</span><span style=color:teal>clear</span><span style=color:#000;font-weight:700>();</span>
+			<span style=color:#998;font-style:italic>// 创建解码器
+</span><span style=color:#998;font-style:italic></span>			CharsetDecoder decoder <span style=color:#000;font-weight:700>=</span> charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>newDecoder</span><span style=color:#000;font-weight:700>();</span>
+			<span style=color:#998;font-style:italic>// 使用解码器将byteBuffer转换为CharBuffer
+</span><span style=color:#998;font-style:italic></span>			CharBuffer decode <span style=color:#000;font-weight:700>=</span> decoder<span style=color:#000;font-weight:700>.</span><span style=color:teal>decode</span><span style=color:#000;font-weight:700>(</span>mbb<span style=color:#000;font-weight:700>);</span>
+			System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span>decode<span style=color:#000;font-weight:700>);</span>
+		<span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>Exception e<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+
+		<span style=color:#000;font-weight:700>}</span>
+	<span style=color:#000;font-weight:700>}</span>
+
+<span style=color:#000;font-weight:700>}</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>这就是一个基本的例子，用于文件复制，可以看到<code>fo.write(mbb)</code>的时候，是将<code>mbb Buffer</code>的数据输出到另一个文件的，看起来就像是
+在内存中，而不是在文件里, 这就是<strong>内存映射文件</strong>.</p>
+<p>我们来看看map的实现</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java>  <span style=color:#000;font-weight:700>public</span> MappedByteBuffer <span style=color:#900;font-weight:700>map</span><span style=color:#000;font-weight:700>(</span>MapMode mode<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> position<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> size<span style=color:#000;font-weight:700>)</span>
+    <span style=color:#000;font-weight:700>...</span><span style=color:teal>省略非关键代码</span>
+        <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#998;font-style:italic>// 调用map0这个native方法
+</span><span style=color:#998;font-style:italic></span>            addr <span style=color:#000;font-weight:700>=</span> map0<span style=color:#000;font-weight:700>(</span>imode<span style=color:#000;font-weight:700>,</span> mapPosition<span style=color:#000;font-weight:700>,</span> mapSize<span style=color:#000;font-weight:700>);</span>
+        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>OutOfMemoryError x<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+            <span style=color:#998;font-style:italic>// An OutOfMemoryError may indicate that we&#39;ve exhausted memory
+</span><span style=color:#998;font-style:italic></span>            <span style=color:#998;font-style:italic>// so force gc and re-attempt map
+</span><span style=color:#998;font-style:italic></span>            <span style=color:#998;font-style:italic>// gc下防止内存不够
+</span><span style=color:#998;font-style:italic></span>            System<span style=color:#000;font-weight:700>.</span><span style=color:teal>gc</span><span style=color:#000;font-weight:700>();</span>
+            <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+                <span style=color:#998;font-style:italic>// 等待gc结束
+</span><span style=color:#998;font-style:italic></span>                Thread<span style=color:#000;font-weight:700>.</span><span style=color:teal>sleep</span><span style=color:#000;font-weight:700>(</span>100<span style=color:#000;font-weight:700>);</span>
+            <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>InterruptedException y<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+                Thread<span style=color:#000;font-weight:700>.</span><span style=color:teal>currentThread</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>interrupt</span><span style=color:#000;font-weight:700>();</span>
+            <span style=color:#000;font-weight:700>}</span>
+            <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+                <span style=color:#998;font-style:italic>// 再试一次
+</span><span style=color:#998;font-style:italic></span>                addr <span style=color:#000;font-weight:700>=</span> map0<span style=color:#000;font-weight:700>(</span>imode<span style=color:#000;font-weight:700>,</span> mapPosition<span style=color:#000;font-weight:700>,</span> mapSize<span style=color:#000;font-weight:700>);</span>
+            <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>OutOfMemoryError y<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+                <span style=color:#998;font-style:italic>// After a second OOME, fail
+</span><span style=color:#998;font-style:italic></span>                <span style=color:#000;font-weight:700>throw</span> <span style=color:#000;font-weight:700>new</span> IOException<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;Map failed&#34;</span><span style=color:#000;font-weight:700>,</span> y<span style=color:#000;font-weight:700>);</span>
+            <span style=color:#000;font-weight:700>}</span>
+        <span style=color:#000;font-weight:700>}</span>
+    <span style=color:#000;font-weight:700>...</span>
+    <span style=color:#000;font-weight:700>}</span>
+    
+    <span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>native</span> <span style=color:#458;font-weight:700>long</span> <span style=color:#900;font-weight:700>map0</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>int</span> prot<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> position<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> length<span style=color:#000;font-weight:700>)</span>
+    <span style=color:#000;font-weight:700>throws</span> IOException<span style=color:#000;font-weight:700>;</span>
+</code></pre></td></tr></table>
+</div>
+</div><p>打开<code>FileChannelImpl.c</code></p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c>JNIEXPORT jlong JNICALL
+<span style=color:#900;font-weight:700>Java_sun_nio_ch_FileChannelImpl_map0</span>(JNIEnv <span style=color:#000;font-weight:700>*</span>env, jobject this,
+                                     jint prot, jlong off, jlong len)
+{
+    <span style=color:#458;font-weight:700>void</span> <span style=color:#000;font-weight:700>*</span>mapAddress <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+    jobject fdo <span style=color:#000;font-weight:700>=</span> (<span style=color:#000;font-weight:700>*</span>env)<span style=color:#000;font-weight:700>-&gt;</span>GetObjectField(env, this, chan_fd);
+    jint fd <span style=color:#000;font-weight:700>=</span> fdval(env, fdo);
+    <span style=color:#458;font-weight:700>int</span> protections <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+    <span style=color:#458;font-weight:700>int</span> flags <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+
+    <span style=color:#000;font-weight:700>if</span> (prot <span style=color:#000;font-weight:700>==</span> sun_nio_ch_FileChannelImpl_MAP_RO) {
+        protections <span style=color:#000;font-weight:700>=</span> PROT_READ;
+        flags <span style=color:#000;font-weight:700>=</span> MAP_SHARED;
+    } <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>if</span> (prot <span style=color:#000;font-weight:700>==</span> sun_nio_ch_FileChannelImpl_MAP_RW) {
+        protections <span style=color:#000;font-weight:700>=</span> PROT_WRITE <span style=color:#000;font-weight:700>|</span> PROT_READ;
+        flags <span style=color:#000;font-weight:700>=</span> MAP_SHARED;
+    } <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>if</span> (prot <span style=color:#000;font-weight:700>==</span> sun_nio_ch_FileChannelImpl_MAP_PV) {
+        protections <span style=color:#000;font-weight:700>=</span>  PROT_WRITE <span style=color:#000;font-weight:700>|</span> PROT_READ;
+        flags <span style=color:#000;font-weight:700>=</span> MAP_PRIVATE;
+    }
+
+    <span style=color:#998;font-style:italic>// 所以还是使用的mmap这个API
+</span><span style=color:#998;font-style:italic></span>    mapAddress <span style=color:#000;font-weight:700>=</span> mmap64(
+        <span style=color:#099>0</span>,                    <span style=color:#998;font-style:italic>/* Let OS decide location */</span>
+        len,                  <span style=color:#998;font-style:italic>/* Number of bytes to map */</span>
+        protections,          <span style=color:#998;font-style:italic>/* File permissions */</span>
+        flags,                <span style=color:#998;font-style:italic>/* Changes are shared */</span>
+        fd,                   <span style=color:#998;font-style:italic>/* File descriptor of mapped file */</span>
+        off);                 <span style=color:#998;font-style:italic>/* Offset into file */</span>
+
+    <span style=color:#000;font-weight:700>if</span> (mapAddress <span style=color:#000;font-weight:700>==</span> MAP_FAILED) {
+        <span style=color:#000;font-weight:700>if</span> (errno <span style=color:#000;font-weight:700>==</span> ENOMEM) {
+            JNU_ThrowOutOfMemoryError(env, <span style=color:#d14>&#34;Map failed&#34;</span>);
+            <span style=color:#000;font-weight:700>return</span> IOS_THROWN;
+        }
+        <span style=color:#000;font-weight:700>return</span> handle(env, <span style=color:#000;font-weight:700>-</span><span style=color:#099>1</span>, <span style=color:#d14>&#34;Map failed&#34;</span>);
+    }
+
+    <span style=color:#000;font-weight:700>return</span> ((jlong) (<span style=color:#458;font-weight:700>unsigned</span> <span style=color:#458;font-weight:700>long</span>) mapAddress);
+}
+</code></pre></td></tr></table>
+</div>
+</div><p>可以看到，还是使用的我们<code>mmap</code>的api, 了解一些底层知识还是有必要的, JVM很多东西都是对底层的一层封装.</p>
+<p>另一个API <code>transferTo</code>同理，最后调用的是<code>transferTo0</code>方法:</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c>JNIEXPORT jlong JNICALL
+<span style=color:#900;font-weight:700>Java_sun_nio_ch_FileChannelImpl_transferTo0</span>(JNIEnv <span style=color:#000;font-weight:700>*</span>env, jobject this,
+                                            jint srcFD,
+                                            jlong position, jlong count,
+                                            jint dstFD)
+{
+    off64_t offset <span style=color:#000;font-weight:700>=</span> (off64_t)position;
+    <span style=color:#998;font-style:italic>// 调用sendfile方法
+</span><span style=color:#998;font-style:italic></span>    jlong n <span style=color:#000;font-weight:700>=</span> sendfile64(dstFD, srcFD, <span style=color:#000;font-weight:700>&amp;</span>offset, (size_t)count);
+    <span style=color:#000;font-weight:700>if</span> (n <span style=color:#000;font-weight:700>&lt;</span> <span style=color:#099>0</span>) {
+        <span style=color:#000;font-weight:700>if</span> (errno <span style=color:#000;font-weight:700>==</span> EAGAIN)
+            <span style=color:#000;font-weight:700>return</span> IOS_UNAVAILABLE;
+        <span style=color:#000;font-weight:700>if</span> ((errno <span style=color:#000;font-weight:700>==</span> EINVAL) <span style=color:#000;font-weight:700>&amp;&amp;</span> ((ssize_t)count <span style=color:#000;font-weight:700>&gt;=</span> <span style=color:#099>0</span>))
+            <span style=color:#000;font-weight:700>return</span> IOS_UNSUPPORTED_CASE;
+        <span style=color:#000;font-weight:700>if</span> (errno <span style=color:#000;font-weight:700>==</span> EINTR) {
+            <span style=color:#000;font-weight:700>return</span> IOS_INTERRUPTED;
+        }
+        JNU_ThrowIOExceptionWithLastError(env, <span style=color:#d14>&#34;Transfer failed&#34;</span>);
+        <span style=color:#000;font-weight:700>return</span> IOS_THROWN;
+    }
+    <span style=color:#000;font-weight:700>return</span> n;
+}
+</code></pre></td></tr></table>
+</div>
+</div><p>可以看到封装的是<code>sendfile</code>这个方法，这里看的是jvm在linux系统的的实现。</p>
+<h1 id=3-总结>3. 总结</h1>
+<p>本文主要介绍了Linux中<code>Zero-Copy零拷贝</code>的概念，分类和解决方案。</p>
+<p>同时介绍了NIO对<code>Zero-Copy</code>的支持, 分别是<code>FileChannel.map</code>以及<code>FileChannel.transferTo</code>.</p>
+<p>在高并发场景下，这点提升是很关键的，著名框架<code>Netty</code>, <code>Kafka</code>都大量使用了零拷贝的API, 是其高性能的原因之一。</p>
+<hr>
+<p>参考资料</p>
+<ol>
+<li><a href=https://www.linuxjournal.com/article/6345>Zero Copy I: User-Mode Perspective</a></li>
+<li><a href=https://en.wikipedia.org/wiki/Zero-copy>wikipedia: zero copy</a></li>
+<li><a href=https://www.ibm.com/developerworks/cn/linux/l-cn-zerocopy1/index.html>Linux 中的零拷贝技术，第 1 部分</a></li>
+</ol>
+</div>
+<div class=post-archive>
+<ul class=post-copyright>
+<li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li>
+<li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/</a></li>
+<li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li>
+</ul>
+</div>
+<br>
+<div class=post-archive>
+<h2>See Also</h2>
+<ul class=listing>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/>Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java NIO分析(9): 从BSD socket到SocketChannel</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/>Java NIO分析(8): 高并发核心Selector详解</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java NIO分析(6): 从BIO到NIO-设计和概念</a></li>
+</ul>
+</div>
+<div class="post-meta meta-tags">
+<ul class=clearfix>
+<li><a href=/tags/nio-linux>NIO Linux</a></li>
+</ul>
+</div>
+</article>
+<div class="post bg-white">
+<script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script>
+</div>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[['$','$']],processEscapes:!0}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

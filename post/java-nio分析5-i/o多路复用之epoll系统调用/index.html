@@ -1,0 +1,484 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Java NIO分析(5): I/O多路复用之epoll系统调用 | Chris的博客</title>
+<meta property="og:title" content="Java NIO分析(5): I/O多路复用之epoll系统调用 - Chris的博客">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-07-01T17:59:51+08:00">
+<meta property="article:modified_time" content="2018-07-01T17:59:51+08:00">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="Java NIO分析(5): I/O多路复用之epoll系统调用">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a class=current href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<article class=post>
+<header>
+<h1 class=post-title>Java NIO分析(5): I/O多路复用之epoll系统调用</h1>
+</header>
+<date class="post-meta meta-date">
+2018年7月1日
+</date>
+<div class=post-content>
+<h1 id=1-epoll概念>1. epoll概念</h1>
+<p><code>poll</code>系统调用相比于<code>select</code>主要解决了文件描述符的数量限制，但是在高并发场景下没有解决根本问题:</p>
+<ol>
+<li><strong>fd数组整体在内核空间和用户空间之间拷贝</strong></li>
+<li><strong>遍历整个fd数组找事件浪费资源</strong></li>
+</ol>
+<p>这俩性能问题在<strong>Banga</strong>在1999年写了篇论文<a href=http://static.usenix.org/event/usenix99/full_papers/banga/banga.pdf>A Scalable and Explicit Event
+Delivery Mechanism for UNIX</a>,提出<code>select</code>和<code>poll</code>都是无状态的，需要用户空间的进程<strong>自行遍历查找事件</strong>, 一种改进方案是<strong>内核内部自己维护事件集合</strong>.通过一个类似<code>declare_interest</code>的系统调用，内核能够<strong>增量得更新进程感兴趣的事件集合列表</strong>, 应用进程通过使用<code>get_next_event</code>调用能派发新事件给内核。</p>
+<p>根据论文的研究成果，<code>LINUX</code>和<code>FreeBSD</code>各自给出的解决方案：<code>epoll</code>和<code>kqueue</code>.我们主要讨论epoll, 毕竟日常服务端环境都是LINUX.</p>
+<p>在LINUX内核2.6以上，<code>epoll</code>才受到支持。</p>
+<h1 id=2-epoll函数>2. epoll函数</h1>
+<p>epoll操作过程有3个函数</p>
+<pre tabindex=0><code>#include &lt;sys/epoll.h&gt;
+
+int epoll_create(int size);
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+
+int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);
+</code></pre><ol>
+<li><code>epoll_create</code>创建一个<code>epoll fd</code>和事件表, 在LINUX2.6.8以后是使用红黑树来管理epoll事件表，所以size没有太大作用</li>
+<li><code>epoll_ctl</code>操作上面创建的epoll事件表, 可以加入socket读写事件</li>
+<li><code>epoll_wait</code>类似于以前的<code>select</code>和<code>poll</code>,得到发生的事件, 如socket可读可写</li>
+</ol>
+<p><code>epoll_ctl</code>的第二个参数使用3个宏来表示动作:</p>
+<ul>
+<li><code>EPOLL_CTL_ADD</code>: 注册新的fd到epfd中</li>
+<li><code>EPOLL_CTL_MOD</code>: 修改意见注册的fd的监听事件</li>
+<li><code>EPOLL_CTL_DEL</code>: 从epfd中删除一个fd</li>
+</ul>
+<p>第四个参数用来告诉内核需要监听什么事件, <code>epoll_event</code>结构如下</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=color:#000;font-weight:700>struct</span> epoll_event {
+  __uint32_t events; <span style=color:#998;font-style:italic>// epoll事件
+</span><span style=color:#998;font-style:italic></span>  epoll_data_t data; <span style=color:#998;font-style:italic>// 用户数据变量
+</span><span style=color:#998;font-style:italic></span>}
+</code></pre></td></tr></table>
+</div>
+</div><p>epoll事件和以前<code>poll</code>的事件类型差不多,主要还是这仨:</p>
+<ul>
+<li>EPOLLIN: 对应的fd可读</li>
+<li>EPOLLOUT: 对应的fd可写</li>
+<li>EPOLLERR: 对应的fd发送初五</li>
+</ul>
+<h1 id=3-epoll实战>3. epoll实战</h1>
+<p>首先，MacOS是基于BSD的，所以是没有<code>epoll</code>函数的，在Mac下开发，得去LINUX环境编译。依然是老5步</p>
+<ol>
+<li>新建socket, 用于监听端口</li>
+<li>socket的fd绑定端口</li>
+<li>socket监听</li>
+<li>创建epoll fd</li>
+<li>发起epoll_wait获取事件，使用epoll_ctl管理事件</li>
+</ol>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  2
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  3
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  4
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  5
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  6
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  7
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  8
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  9
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 10
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 11
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 12
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 13
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 14
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 15
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 16
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 17
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 18
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 19
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 20
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 21
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 22
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 23
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 24
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 25
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 26
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 27
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 28
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 29
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 30
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 31
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 32
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 33
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 34
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 35
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 36
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 37
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 38
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 39
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 40
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 41
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 42
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 43
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 44
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 45
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 46
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 47
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 48
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 49
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 50
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 51
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 52
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 53
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 54
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 55
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 56
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 57
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 58
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 59
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 60
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 61
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 62
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 63
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 64
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 65
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 66
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 67
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 68
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 69
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 70
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 71
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 72
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 73
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 74
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 75
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 76
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 77
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 78
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 79
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 80
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 81
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 82
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 83
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 84
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 85
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 86
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 87
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 88
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 89
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 90
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 91
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 92
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 93
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 94
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 95
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 96
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 97
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 98
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 99
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">100
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">101
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">102
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">103
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">104
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">105
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">106
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">107
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">108
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">109
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">110
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">111
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">112
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">113
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;sys/socket.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;netinet/in.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;arpa/inet.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;unistd.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;stdlib.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;assert.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;stdio.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;string.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;errno.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;sys/epoll.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
+</span><span style=color:#999;font-weight:700;font-style:italic></span>
+<span style=color:#999;font-weight:700;font-style:italic>#define MAX_FD_NUM 1024
+</span><span style=color:#999;font-weight:700;font-style:italic>#define MAXLEN 1024
+</span><span style=color:#999;font-weight:700;font-style:italic></span>
+<span style=color:#458;font-weight:700>int</span> buf_len <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+
+<span style=color:#458;font-weight:700>int</span> <span style=color:#900;font-weight:700>main</span>()
+{
+    <span style=color:#998;font-style:italic>// 1. 新建socket, 用于监听端口
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#458;font-weight:700>int</span> listenfd <span style=color:#000;font-weight:700>=</span> socket(AF_INET, SOCK_STREAM, <span style=color:#099>0</span>);
+    <span style=color:#000;font-weight:700>if</span> (listenfd <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>-</span><span style=color:#099>1</span>) printf(<span style=color:#d14>&#34;创建socket失败， error: %s (errno: %d)</span><span style=color:#d14>\n</span><span style=color:#d14>&#34;</span>, strerror(errno), errno);
+
+    <span style=color:#998;font-style:italic>// 2. 绑定端口
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#458;font-weight:700>unsigned</span> <span style=color:#458;font-weight:700>short</span> listenPort <span style=color:#000;font-weight:700>=</span> <span style=color:#099>8090</span>;
+    <span style=color:#000;font-weight:700>struct</span> sockaddr_in server_addr;
+    memset(<span style=color:#000;font-weight:700>&amp;</span>server_addr, <span style=color:#099>0</span>, <span style=color:#000;font-weight:700>sizeof</span>(server_addr));
+    server_addr.sin_family <span style=color:#000;font-weight:700>=</span> AF_INET;
+    server_addr.sin_addr.s_addr <span style=color:#000;font-weight:700>=</span> htonl(INADDR_ANY);
+    server_addr.sin_port <span style=color:#000;font-weight:700>=</span> htons(listenPort);
+
+    <span style=color:#458;font-weight:700>int</span> on <span style=color:#000;font-weight:700>=</span> <span style=color:#099>1</span>;
+    <span style=color:#998;font-style:italic>// 设置socket绑定的端口，再程序关闭之后可以重复使用
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>if</span> ((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, <span style=color:#000;font-weight:700>&amp;</span>on, <span style=color:#000;font-weight:700>sizeof</span>(<span style=color:#458;font-weight:700>int</span>))) <span style=color:#000;font-weight:700>&lt;</span> <span style=color:#099>0</span>) {
+        exit(<span style=color:#099>1</span>);
+    }
+    <span style=color:#458;font-weight:700>int</span> bindRet <span style=color:#000;font-weight:700>=</span> bind(listenfd, (<span style=color:#000;font-weight:700>struct</span> sockaddr <span style=color:#000;font-weight:700>*</span>) <span style=color:#000;font-weight:700>&amp;</span>server_addr, <span style=color:#000;font-weight:700>sizeof</span>(server_addr));
+    <span style=color:#000;font-weight:700>if</span> (bindRet <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>-</span><span style=color:#099>1</span>) {
+        printf(<span style=color:#d14>&#34;socket绑定地址失败， error: %s (errno: %d)</span><span style=color:#d14>\n</span><span style=color:#d14>&#34;</span>, strerror(errno), errno);
+        exit(<span style=color:#099>1</span>);
+    }
+
+    <span style=color:#998;font-style:italic>// 3. 监听端口
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#458;font-weight:700>int</span> listenRet <span style=color:#000;font-weight:700>=</span> listen(listenfd, <span style=color:#099>10</span>);
+    <span style=color:#000;font-weight:700>if</span> (listenRet <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>-</span><span style=color:#099>1</span>) printf(<span style=color:#d14>&#34;socket监听端口失败， error: %s (errno: %d)</span><span style=color:#d14>\n</span><span style=color:#d14>&#34;</span>, strerror(errno), errno);
+    printf(<span style=color:#d14>&#34;socket 监听完毕, 地址: 127.0.0.1:%d&#34;</span>, listenPort);
+
+    <span style=color:#000;font-weight:700>struct</span> sockaddr_in client_addr;
+    socklen_t client_addr_len <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>sizeof</span>(<span style=color:#000;font-weight:700>struct</span> sockaddr_in);
+
+    <span style=color:#998;font-style:italic>// 4. 创建一个 epfd，并且把 listenfd 注册到这个 epfd上。
+</span><span style=color:#998;font-style:italic></span>    <span style=color:#458;font-weight:700>int</span> epfd <span style=color:#000;font-weight:700>=</span> epoll_create(<span style=color:#099>1024</span>);
+    <span style=color:#000;font-weight:700>struct</span> epoll_event ev,events[<span style=color:#099>20</span>];
+    ev.data.fd <span style=color:#000;font-weight:700>=</span> listenfd;
+    ev.events <span style=color:#000;font-weight:700>=</span> EPOLLIN;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, <span style=color:#000;font-weight:700>&amp;</span>ev);
+
+    <span style=color:#458;font-weight:700>int</span> cur_fd_num <span style=color:#000;font-weight:700>=</span> <span style=color:#099>1</span>;
+    <span style=color:#458;font-weight:700>char</span> buf[MAXLEN]<span style=color:#000;font-weight:700>=</span>{<span style=color:#099>0</span>};
+
+    <span style=color:#000;font-weight:700>while</span> (<span style=color:#099>1</span>) {
+        <span style=color:#998;font-style:italic>// 5. 调用epoll_wait获取IO事件
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#998;font-style:italic>// nReady 就是 events 数组的长度。
+</span><span style=color:#998;font-style:italic></span>        <span style=color:#458;font-weight:700>int</span> nready <span style=color:#000;font-weight:700>=</span> epoll_wait(epfd, events, <span style=color:#099>20</span>, <span style=color:#099>50</span>);
+
+        <span style=color:#458;font-weight:700>int</span> i <span style=color:#000;font-weight:700>=</span> <span style=color:#099>0</span>;
+        <span style=color:#000;font-weight:700>for</span> (; i <span style=color:#000;font-weight:700>&lt;</span> nready; i<span style=color:#000;font-weight:700>++</span>) {
+            <span style=color:#000;font-weight:700>if</span> (events[i].data.fd <span style=color:#000;font-weight:700>==</span> listenfd) {
+                <span style=color:#458;font-weight:700>int</span> client_sockfd <span style=color:#000;font-weight:700>=</span> accept(listenfd,(<span style=color:#000;font-weight:700>struct</span> sockaddr<span style=color:#000;font-weight:700>*</span>)<span style=color:#000;font-weight:700>&amp;</span>client_addr,<span style=color:#000;font-weight:700>&amp;</span>client_addr_len);
+
+                <span style=color:#000;font-weight:700>if</span>(client_sockfd <span style=color:#000;font-weight:700>&lt;</span> <span style=color:#099>0</span>) {
+                    perror(<span style=color:#d14>&#34;accept&#34;</span>);
+                }
+                <span style=color:#000;font-weight:700>else</span> {
+                    printf(<span style=color:#d14>&#34;accept client_addr %s</span><span style=color:#d14>\n</span><span style=color:#d14>&#34;</span>,inet_ntoa(client_addr.sin_addr));
+                    ev.data.fd <span style=color:#000;font-weight:700>=</span> client_sockfd;
+                    ev.events<span style=color:#000;font-weight:700>=</span>EPOLLIN;
+                    epoll_ctl(epfd, EPOLL_CTL_ADD, client_sockfd, <span style=color:#000;font-weight:700>&amp;</span>ev);
+                }
+            }
+            <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>if</span> (events[i].events <span style=color:#000;font-weight:700>&amp;</span> EPOLLIN) {
+                <span style=color:#458;font-weight:700>int</span> connfd <span style=color:#000;font-weight:700>=</span> events[i].data.fd;
+                <span style=color:#458;font-weight:700>int</span> n <span style=color:#000;font-weight:700>=</span> recv(connfd, buf, MAXLEN, <span style=color:#099>0</span>);
+                <span style=color:#000;font-weight:700>if</span>(n <span style=color:#000;font-weight:700>&lt;=</span> <span style=color:#099>0</span>) {
+                    <span style=color:#000;font-weight:700>if</span>(ECONNRESET <span style=color:#000;font-weight:700>==</span> errno) {
+                        close(connfd);
+                        epoll_ctl(epfd, EPOLL_CTL_DEL, connfd, <span style=color:#099>0</span>);
+                    }
+                    <span style=color:#000;font-weight:700>else</span> {
+                        perror(<span style=color:#d14>&#34;recv&#34;</span>);
+                    }
+                }
+
+                printf(<span style=color:#d14>&#34;receive %s&#34;</span>, buf);
+                buf_len <span style=color:#000;font-weight:700>=</span> n;
+
+                ev.data.fd <span style=color:#000;font-weight:700>=</span> connfd;
+                ev.events <span style=color:#000;font-weight:700>=</span> EPOLLOUT;
+                epoll_ctl(epfd, EPOLL_CTL_MOD, connfd, <span style=color:#000;font-weight:700>&amp;</span>ev);
+            }
+            <span style=color:#000;font-weight:700>else</span> <span style=color:#000;font-weight:700>if</span> (events[i].events <span style=color:#000;font-weight:700>&amp;</span> EPOLLOUT) {
+                <span style=color:#458;font-weight:700>int</span> connfd <span style=color:#000;font-weight:700>=</span> events[i].data.fd;
+                write(connfd, buf, buf_len);
+
+                ev.data.fd <span style=color:#000;font-weight:700>=</span> connfd;
+                ev.events <span style=color:#000;font-weight:700>=</span> EPOLLIN;
+                epoll_ctl(epfd, EPOLL_CTL_MOD, connfd, <span style=color:#000;font-weight:700>&amp;</span>ev);
+            }
+        }
+    }
+
+    <span style=color:#000;font-weight:700>return</span> <span style=color:#099>0</span>;
+}
+
+</code></pre></td></tr></table>
+</div>
+</div><p>使用gcc编译，运行</p>
+<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
+<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span></code></pre></td>
+<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
+<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash>$ gcc -o epoll ./epoll.c
+$ ./epoll
+</code></pre></td></tr></table>
+</div>
+</div><p>然后使用<code>nc</code>测试就好了</p>
+<h1 id=4-epoll总结>4. epoll总结</h1>
+<p><code>epoll</code>解决了<code>select</code>和<code>poll</code>时代遗留的2个性能问题，不需要使fd数组整体在内核空间和用户空间之间来回拷贝，同时
+不需要应用进程遍历整个fd数组以查找发生的事件。<code>epoll</code>使用<code>mmap</code>加速了内核和用户空间的消息传递，避免不必要的内存拷贝。
+<code>epoll</code>只会返回活跃的socket fd,所以I/O效率不会随着fd数目增加而显著下降。</p>
+<p><code>epoll</code>还支持<code>ET(边缘触发)</code>和<code>LT(水平触发)</code>，这些就不细讲了。</p>
+</div>
+<div class=post-archive>
+<ul class=post-copyright>
+<li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li>
+<li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/</a></li>
+<li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li>
+</ul>
+</div>
+<br>
+<div class=post-archive>
+<h2>See Also</h2>
+<ul class=listing>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(4): I/O多路复用之poll系统调用</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(3): I/O多路复用之select系统调用</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/>Java NIO分析(2): I/O多路复用历史杂谈</a></li>
+<li><a href=/post/java-nio%E5%88%86%E6%9E%901-unix%E7%BD%91%E7%BB%9C%E6%A8%A1%E5%9E%8B/>Java NIO分析(1): Unix网络模型</a></li>
+<li><a href=/post/luminus%E6%95%B4%E5%90%88shadow-cljs%E6%89%93%E5%8C%85/>luminus整合shadow-cljs打包</a></li>
+</ul>
+</div>
+<div class="post-meta meta-tags">
+<ul class=clearfix>
+<li><a href=/tags/nio>NIO</a></li>
+</ul>
+</div>
+</article>
+<div class="post bg-white">
+<script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script>
+</div>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[['$','$']],processEscapes:!0}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

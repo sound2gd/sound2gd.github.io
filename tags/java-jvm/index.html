@@ -1,0 +1,223 @@
+<!doctype html><html lang=en-us>
+<head>
+<meta charset=utf-8>
+<meta http-equiv=x-ua-compatible content="IE=edge">
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>JAVA JVM | Chris的博客</title>
+<meta property="og:title" content="JAVA JVM - Chris的博客">
+<meta property="og:type" content="article">
+<meta name=Keywords content="golang,go语言,go语言笔记,sound2gd,Chris,java,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
+<meta name=description content="JAVA JVM">
+<meta name=author content="Chris Wang">
+<meta property="og:url" content="http://sound2gd.wang/tags/java-jvm/">
+<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
+<link rel=stylesheet href=/css/normalize.css>
+<link rel=stylesheet href=/css/style.css>
+<link rel=alternate type=application/rss+xml href=http://sound2gd.wang/tags/java-jvm/index.xml title=Chris的博客>
+<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
+</head>
+<body>
+<header id=header class=clearfix>
+<div class=container>
+<div class=col-group>
+<div class=site-name>
+<a id=logo href=http://sound2gd.wang/>
+Chris的博客
+</a>
+<p class=description>专注于Java、Go语言(golang)、JVM(openjdk)、项目管理、软件架构、金融科技</p>
+</div>
+<div>
+<nav id=nav-menu class=clearfix>
+<a href=http://sound2gd.wang/>首页</a>
+<a href=http://sound2gd.wang/categories/ title=分类>分类</a>
+<a href=http://sound2gd.wang/archives/ title=归档>归档</a>
+<a href=http://sound2gd.wang/about/ title=关于>关于</a>
+</nav>
+</div>
+</div>
+</div>
+</header>
+<div id=body>
+<div class=container>
+<div class=col-group>
+<div class=col-8 id=main>
+<div class=res-cons>
+<h3 class=archive-title>
+包含标签
+<span class=keyword>JAVA JVM</span>
+的文章
+</h3>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>JVM拾遗(4): Java对象的创建及内存布局</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2019年2月15日
+</date>
+<div class=post-content>
+<p>上一节<a href=/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>JVM拾遗-3-类装载机制</a>讲了JVM如何将类装载到虚拟机以供后续使用
+那么JVM是如何创建类的实例呢?该对象是如何分配内存的?</p>
+<h1 id=1-实例化>1. 实例化</h1>
+<h2 id=11-创建对象的方式>1.1 创建对象的方式</h2>
+<p>Java对象的创建, 有多种方式，最简单就是<code>new XXClass</code>, 还可以通过<code>反射</code>，<code>xx.clone()</code>,<code>反序列化</code>以及黑科技<code>Unsafe.allocateInstance</code>等方法.</p>
+<p><code>new</code>和反射创建对象实例的时候，会初始化实例字段.</p>
+<p>如果类没有构造器，会默认添加构造器，并且编译成<code>&lt;init></code>方法.
+默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p>……
+<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>阅读全文</a></p>
+</div>
+</article>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>JVM拾遗(3): 类装载机制</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2019年2月12日
+</date>
+<div class=post-content>
+<p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?</p>
+<p><strong>简言之: JVM会读取<code>.class</code>文件并加载和初始化到方法区</strong>, 之后才能被后续程序使用.
+同时该过程还需要满足一些要求:</p>
+<ul>
+<li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法
+<ul>
+<li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换</li>
+<li>class文件里的各个符号引用要合法</li>
+</ul>
+</li>
+<li>允许运行时添加功能, 如各种分析工具包(arthas)等</li>
+</ul>
+<p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。</p>……
+<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>阅读全文</a></p>
+</div>
+</article>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/>JVM拾遗(2): 平台无关性基石之Class解析</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2018年10月25日
+</date>
+<div class=post-content>
+<p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。
+前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是
+先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。</p>
+<p>这次谈谈Java的平台无关性的基石: <code>Class</code>文件。</p>……
+<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/>阅读全文</a></p>
+</div>
+</article>
+<article class=post>
+<header>
+<h1 class=post-title>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/>JVM拾遗(1): 万米高空看JVM</a>
+</h1>
+</header>
+<date class="post-meta meta-date">
+2018年9月26日
+</date>
+<div class=post-content>
+<p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。
+关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。</p>
+<p>以前看过林林总总的JVM书籍，比如周志明大佬的<code>&lt;&lt;深入理解Java虚拟机>></code>和张秀宏大佬的<code>&lt;&lt;自己动手写Java虚拟机>></code>, 也跟着造了个小JVM,所以也尝试将知识整理下
+本系列会比较长，但是会把知识点细分，前后贯通串起来。
+如果没有特殊指出，JVM使用的是<a href=https://en.wikipedia.org/wiki/HotSpot>Hotspot VM</a>,JDK使用的是<a href=http://openjdk.java.net>OpenJDK8</a></p>……
+<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/>阅读全文</a></p>
+</div>
+</article>
+</div>
+<footer id=footer>
+<div>
+&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
+</div>
+<br>
+<div>
+<div class=github-badge>
+<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+</div>
+<div class=github-badge>
+<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+</div>
+</div>
+</footer>
+<a id=rocket href=#top></a>
+<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=application/javascript>var doNotTrack=!1;doNotTrack||(window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)},ga.l=+new Date,ga('create','G-N5MSKS0SN8','auto'),ga('send','pageview'))</script>
+<script async src=https://www.google-analytics.com/analytics.js></script>
+</div>
+<div id=secondary>
+<section class=widget>
+<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
+<input type=text name=q maxlength=20 placeholder=Search>
+<input type=hidden name=sitesearch value=http://sound2gd.wang/>
+<button type=submit class="submit icon-search"></button>
+</form>
+</section>
+<section class=widget>
+<h3 class=widget-title>最近文章</h3>
+<ul class=widget-list>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
+</li>
+<li>
+<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(8): 高并发核心Selector详解">Java NIO分析(8): 高并发核心Selector详解</a>
+</li>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/categories/>分类</a></h3>
+<ul class=widget-list>
+</ul>
+</section>
+<section class=widget>
+<h3 class=widget-title><a href=/tags/>标签</a></h3>
+<div class=tagcloud>
+<a href=http://sound2gd.wang/tags/clojure/>clojure</a>
+<a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
+<a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
+<a href=http://sound2gd.wang/tags/nio/>NIO</a>
+<a href=http://sound2gd.wang/tags/nio-linux/>NIO Linux</a>
+</div>
+</section>
+<section class=widget>
+<h3 class=widget-title>其它</h3>
+<ul class=widget-list>
+<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
