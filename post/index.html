@@ -1,323 +1,32 @@
-<!doctype html><html lang=en-us>
-<head>
-<meta charset=utf-8>
-<meta http-equiv=x-ua-compatible content="IE=edge">
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Posts | Chris的博客</title>
-<meta property="og:title" content="Posts - Chris的博客">
-<meta property="og:type" content="article">
-<meta name=Keywords content="golang,go语言,sound2gd,Chris,java,jvm,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
-<meta name=description content="Posts">
-<meta name=author content="Chris Wang">
-<meta property="og:url" content="http://sound2gd.wang/post/">
-<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
-<link rel=stylesheet href=/css/normalize.css>
-<link rel=stylesheet href=/css/style.css>
-<link rel=alternate type=application/rss+xml href=http://sound2gd.wang/post/index.xml title=Chris的博客>
-<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
-<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
-</head>
-<body>
-<header id=header class=clearfix>
-<div class=container>
-<div class=col-group>
-<div class=site-name>
-<a id=logo href=http://sound2gd.wang/>
-Chris的博客
-</a>
-<p class=description>专注于Jvm(openjdk)、Go语言(golang)、效率工具、项目管理、软件架构、金融科技</p>
-</div>
-<div>
-<nav id=nav-menu class=clearfix>
-<a class=current href=http://sound2gd.wang/>首页</a>
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1"><title>Posts | Chris的博客</title><meta property="og:title" content="Posts - Chris的博客"><meta property="og:type" content="article"><meta name=Keywords content="golang,go语言,sound2gd,Chris,java,jvm,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序"><meta name=description content="Posts"><meta name=author content="Chris Wang"><meta property="og:url" content="http://sound2gd.wang/post/"><link rel="shortcut icon" href=/favicon.ico type=image/x-icon><link rel=stylesheet href=/css/normalize.css><link rel=stylesheet href=/css/style.css><link rel=alternate type=application/rss+xml href=http://sound2gd.wang/post/index.xml title=Chris的博客><script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet></head><body><header id=header class=clearfix><div class=container><div class=col-group><div class=site-name><a id=logo href=http://sound2gd.wang/>Chris的博客</a><p class=description>专注于Jvm(openjdk)、Go语言(golang)、效率工具、项目管理、软件架构、金融科技</p></div><div><nav id=nav-menu class=clearfix><a class=current href=http://sound2gd.wang/>首页</a>
 <a href=http://sound2gd.wang/archives/ title=归档>归档</a>
 <a href=http://sound2gd.wang/life/ title=学习>学习</a>
-<a href=http://sound2gd.wang/about/ title=关于>关于</a>
-</nav>
-</div>
-</div>
-</div>
-</header>
-<div id=body>
-<div class=container>
-<div class=col-group>
-<div class=col-8 id=main>
-<div class=res-cons>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2022年1月10日
-</date>
-<div class=post-meta>
-<span>|</span>
-<span class=meta-category><a href=/categories/clojure>Clojure</a></span>
-</div>
-<div class=post-content>
-<p>19年以来，clojure社区新出了不少好东西，这里做个整理。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/556f376d/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2019年2月16日
-</date>
-<div class=post-content>
-<p><a href=/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>JVM拾遗-4-Java对象的内存布局</a>讲了JVM如何实例化对象以及对象在内存中的表示.
-本次讲解如何计算一个对象的大小.</p>
-<p>为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.
-这明显不合理会让内存爆炸的需求，怎么怼回去呢?</p>
-<p>这时候就要搬出我们的理论支持来计算一番了.</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2019年2月15日
-</date>
-<div class=post-content>
-<p>上一节<a href=/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>JVM拾遗-3-类装载机制</a>讲了JVM如何将类装载到虚拟机以供后续使用
-那么JVM是如何创建类的实例呢?该对象是如何分配内存的?</p>
-<h1 id=1-实例化>1. 实例化</h1>
-<h2 id=11-创建对象的方式>1.1 创建对象的方式</h2>
-<p>Java对象的创建, 有多种方式，最简单就是<code>new XXClass</code>, 还可以通过<code>反射</code>，<code>xx.clone()</code>,<code>反序列化</code>以及黑科技<code>Unsafe.allocateInstance</code>等方法.</p>
-<p><code>new</code>和反射创建对象实例的时候，会初始化实例字段.</p>
-<p>如果类没有构造器，会默认添加构造器，并且编译成<code>&lt;init></code>方法.
-默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2019年2月12日
-</date>
-<div class=post-content>
-<p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?</p>
-<p><strong>简言之: JVM会读取<code>.class</code>文件并加载和初始化到方法区</strong>, 之后才能被后续程序使用.
-同时该过程还需要满足一些要求:</p>
-<ul>
-<li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法
-<ul>
-<li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换</li>
-<li>class文件里的各个符号引用要合法</li>
-</ul>
-</li>
-<li>允许运行时添加功能, 如各种分析工具包(arthas)等</li>
-</ul>
-<p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年10月25日
-</date>
-<div class=post-content>
-<p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。
+<a href=http://sound2gd.wang/about/ title=关于>关于</a></nav></div></div></div></header><div id=body><div class=container><div class=col-group><div class=col-8 id=main><div class=res-cons><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></h1></header><date class="post-meta meta-date">2022年7月5日</date><div class=post-content><p>2022年了，有很多古老的命令行工具已经过时了，可以用新时代语言rust写的对标来平替.</p><h1 id=1-常用系列>1. 常用系列</h1><h2 id=11-目录查看-ls---exa>1.1 目录查看 ls -> exa</h2><p>自带各种颜色高亮匹配的ls, 能识别出符号链接、扩展属性、git、各类文件类型等。</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>$ brew install exa
+</span></span></code></pre></td></tr></table></div></div><p>gayhub地址: <a href=https://github.com/ogham/exa>exa</a></p><p><a data-fancybox=gallery href=https://github.com/ogham/exa/raw/master/screenshots.png><img class=mx-auto alt src=https://github.com/ogham/exa/raw/master/screenshots.png></a></p><h2 id=12-文本搜索-grep---rg>1.2 文本搜索 grep -> rg</h2><p>rg可能是最快的文本搜索工具了，与各类开发约定和文件有较好的集成，例如能识别gitignore中的忽略文件、跳过隐藏文件、二进制文件等等。</p><p>gayhub地址: <a href=https://github.com/BurntSushi/ripgrep>ripgrep</a></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>$ brew install ripgrep
+</span></span></code></pre></td></tr></table></div></div><p><a data-fancybox=gallery href=https://camo.githubusercontent.com/fe9229337cbfaffcf22d52a1e363f268a3c68901acc8f66116bf8705655e92b0/68747470733a2f2f6275726e7473757368692e6e65742f73747566662f72697067726570312e706e67><img class=mx-auto alt src=https://camo.githubusercontent.com/fe9229337cbfaffcf22d52a1e363f268a3c68901acc8f66116bf8705655e92b0/68747470733a2f2f6275726e7473757368692e6e65742f73747566662f72697067726570312e706e67></a></p>……</div><p class=readmore><a href=http://sound2gd.wang/post/bcd1a91c/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></h1></header><date class="post-meta meta-date">2022年1月10日</date><div class=post-meta><span>|</span>
+<span class=meta-category><a href=/categories/clojure>Clojure</a></span></div><div class=post-content><p>19年以来，clojure社区新出了不少好东西，这里做个整理。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/556f376d/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></h1></header><date class="post-meta meta-date">2019年2月16日</date><div class=post-content><p><a href=/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>JVM拾遗-4-Java对象的内存布局</a>讲了JVM如何实例化对象以及对象在内存中的表示.
+本次讲解如何计算一个对象的大小.</p><p>为啥要讲这个? 因为笔者在做一块业务的时候，老板有次让从数据库取100000条天气数据，在内存里按业务规则排序.
+这明显不合理会让内存爆炸的需求，怎么怼回去呢?</p><p>这时候就要搬出我们的理论支持来计算一番了.</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></h1></header><date class="post-meta meta-date">2019年2月15日</date><div class=post-content><p>上一节<a href=/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>JVM拾遗-3-类装载机制</a>讲了JVM如何将类装载到虚拟机以供后续使用
+那么JVM是如何创建类的实例呢?该对象是如何分配内存的?</p><h1 id=1-实例化>1. 实例化</h1><h2 id=11-创建对象的方式>1.1 创建对象的方式</h2><p>Java对象的创建, 有多种方式，最简单就是<code>new XXClass</code>, 还可以通过<code>反射</code>，<code>xx.clone()</code>,<code>反序列化</code>以及黑科技<code>Unsafe.allocateInstance</code>等方法.</p><p><code>new</code>和反射创建对象实例的时候，会初始化实例字段.</p><p>如果类没有构造器，会默认添加构造器，并且编译成<code>&lt;init></code>方法.
+默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></h1></header><date class="post-meta meta-date">2019年2月12日</date><div class=post-content><p>上一篇我们了解了class文件结构, 那么JVM如何使用编译好的class二进制文件?</p><p><strong>简言之: JVM会读取<code>.class</code>文件并加载和初始化到方法区</strong>, 之后才能被后续程序使用.
+同时该过程还需要满足一些要求:</p><ul><li>加载的class文件不能影响虚拟机的稳定性, 也就是class文件要正确合法<ul><li>java的rt.jar里定义的类,如java.lang.Object, 不能被替换</li><li>class文件里的各个符号引用要合法</li></ul></li><li>允许运行时添加功能, 如各种分析工具包(arthas)等</li></ul><p>JVM是解释执行字节码的，不像c/c++那样编译的时候静态链接完了, 是在运行时期动态链接的。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></h1></header><date class="post-meta meta-date">2018年10月25日</date><div class=post-content><p>博客备案了一个月，中途也有各种工作的事情，现在继续更新。
 前面从比较远的角度介绍了JVM的一些小常识, 如果没看懂也没关系，毕竟学习的过程就是
-先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。</p>
-<p>这次谈谈Java的平台无关性的基石: <code>Class</code>文件。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年9月26日
-</date>
-<div class=post-content>
-<p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。
-关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。</p>
-<p>以前看过林林总总的JVM书籍，比如周志明大佬的<code>&lt;&lt;深入理解Java虚拟机>></code>和张秀宏大佬的<code>&lt;&lt;自己动手写Java虚拟机>></code>, 也跟着造了个小JVM,所以也尝试将知识整理下
+先感性认识，后才能升华到理性认识。所谓书读百遍其义自见也是类似的道理。</p><p>这次谈谈Java的平台无关性的基石: <code>Class</code>文件。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></h1></header><date class="post-meta meta-date">2018年9月26日</date><div class=post-content><p>开个新系列，本系列会对JVM的知识点拾遗, 也是对自己JVM学习的一个梳理。
+关于JVM的方方面面都会讲到，应该会是理论为主，辅代码和图(不会是纯理论的)。</p><p>以前看过林林总总的JVM书籍，比如周志明大佬的<code>&lt;&lt;深入理解Java虚拟机>></code>和张秀宏大佬的<code>&lt;&lt;自己动手写Java虚拟机>></code>, 也跟着造了个小JVM,所以也尝试将知识整理下
 本系列会比较长，但是会把知识点细分，前后贯通串起来。
-如果没有特殊指出，JVM使用的是<a href=https://en.wikipedia.org/wiki/HotSpot>Hotspot VM</a>,JDK使用的是<a href=http://openjdk.java.net>OpenJDK8</a></p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年7月31日
-</date>
-<div class=post-content>
-<p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧
+如果没有特殊指出，JVM使用的是<a href=https://en.wikipedia.org/wiki/HotSpot>Hotspot VM</a>,JDK使用的是<a href=http://openjdk.java.net>OpenJDK8</a></p>……</div><p class=readmore><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></h1></header><date class="post-meta meta-date">2018年7月31日</date><div class=post-content><p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧
 写这个系列的起因是各个框架比如<code>netty</code>, <code>tomcat</code>, <code>jetty</code>这些高性能框架的
-基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年7月24日
-</date>
-<div class=post-content>
-<p>前面已经讲了<code>Selector</code>,<code>SocketChannel</code>和<code>DirectBuffer</code>, 这些是NIO网络编程中最核心的组件
-接下来我们会再讲几点非核心的优化(不代表不重要, 只是API不占NIO设计的大头):</p>
-<ul>
-<li>文件传输(File Transfer): 文件内容直接发送到网卡, 或者从网卡直接读到文件里</li>
-<li>内存映射文件(Memory-mapped Files): 将文件的一块映射到内存</li>
-</ul>
-<p>这两项本质上都基于<code>零拷贝(zero copy)</code>技术。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年7月21日
-</date>
-<div class=post-content>
-<p>前面我们详细讲了<a href=/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/>Java-NIO分析-8-Selector详解</a>和<a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java-NIO分析-9-从BSD-socket到SocketChannel</a>, 分别是NIO的事件分发器和非阻塞处理器.</p>
-<p>为了支持<code>Channel</code>的双向读写和<code>Scatter/Gather</code>操作，我们还需要<code>Buffer</code>,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解.</p>
-<p>接下来我们聊聊JVM使用堆外内存的沧桑历史以及为什么要设计出<code>DirectBuffer</code>。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/>阅读全文</a></p>
-</article>
-<article class=post>
-<header>
-<h1 class=post-title>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
-</h1>
-</header>
-<date class="post-meta meta-date">
-2018年7月16日
-</date>
-<div class=post-content>
-<p>前面我们讲了高并发核心<code>Selector</code>的源码分析，看到其对操作系统I/O多路复用的简单封装。
-有了I/O多路复用之后，我们还需要<strong>非阻塞的socket读写操作</strong>.</p>
-<p>因为内核告诉你<strong>A连接</strong>有数据可读，你想要读1K, 事实上只读到了0.5K, 如果使用传统的
-socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费了CPU的时钟周期和珍贵的线程资源。
-使用非阻塞就能在没有读满之前立刻返回，数据先放内存里，然后继续读下一个<strong>B连接</strong>的数据。</p>
-<p><code>SocketChannel</code>就是NIO对于非阻塞socket操作的支持的组件，其在socket上封装了一层, 所以我们先从<code>Socket API</code>说起。</p>……
-</div>
-<p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>阅读全文</a></p>
-</article>
-<ol class=page-navigator>
-<li class=current>
-<a href=http://sound2gd.wang/post/>1</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/page/2/>2</a>
-</li>
-<li class=next>
-<a href=http://sound2gd.wang/post/page/2/>下一页</a>
-</li>
-</ol>
-</div>
-<footer id=footer>
-<div>
-&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
-| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
-</div>
-<br>
-<div>
-<div class=github-badge>
-<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
-</div>
-<div class=github-badge>
-<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
-</div>
-</div>
-</footer>
-<a id=rocket href=#top></a>
-<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></h1></header><date class="post-meta meta-date">2018年7月24日</date><div class=post-content><p>前面已经讲了<code>Selector</code>,<code>SocketChannel</code>和<code>DirectBuffer</code>, 这些是NIO网络编程中最核心的组件
+接下来我们会再讲几点非核心的优化(不代表不重要, 只是API不占NIO设计的大头):</p><ul><li>文件传输(File Transfer): 文件内容直接发送到网卡, 或者从网卡直接读到文件里</li><li>内存映射文件(Memory-mapped Files): 将文件的一块映射到内存</li></ul><p>这两项本质上都基于<code>零拷贝(zero copy)</code>技术。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/>阅读全文</a></p></article><article class=post><header><h1 class=post-title><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></h1></header><date class="post-meta meta-date">2018年7月21日</date><div class=post-content><p>前面我们详细讲了<a href=/post/java-nio%E5%88%86%E6%9E%908-%E9%AB%98%E5%B9%B6%E5%8F%91%E6%A0%B8%E5%BF%83selector%E8%AF%A6%E8%A7%A3/>Java-NIO分析-8-Selector详解</a>和<a href=/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/>Java-NIO分析-9-从BSD-socket到SocketChannel</a>, 分别是NIO的事件分发器和非阻塞处理器.</p><p>为了支持<code>Channel</code>的双向读写和<code>Scatter/Gather</code>操作，我们还需要<code>Buffer</code>,将I/O数据存储备用。普通的Buffer都是JVM堆内的Buffer, 比较好理解.</p><p>接下来我们聊聊JVM使用堆外内存的沧桑历史以及为什么要设计出<code>DirectBuffer</code>。</p>……</div><p class=readmore><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/>阅读全文</a></p></article><ol class=page-navigator><li class=current><a href=http://sound2gd.wang/post/>1</a></li><li><a href=http://sound2gd.wang/post/page/2/>2</a></li><li><a href=http://sound2gd.wang/post/page/3/>3</a></li><li class=next><a href=http://sound2gd.wang/post/page/2/>下一页</a></li></ol></div><footer id=footer><div>&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a></div><br><div><div class=github-badge><a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a></div><div class=github-badge><a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a></div></div></footer><a id=rocket href=#top></a>
+<script type=text/javascript src='/js/totop.js?v=0.0.0' async></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N5MSKS0SN8"></script>
-<script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date),gtag('config','G-N5MSKS0SN8',{anonymize_ip:!1})}</script>
-</div>
-<div id=secondary>
-<section class=widget>
-<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
-<input type=text name=q maxlength=20 placeholder=Search>
+<script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-N5MSKS0SN8",{anonymize_ip:!1})}</script></div><div id=secondary><section class=widget><form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1><input type=text name=q maxlength=20 placeholder=Search>
 <input type=hidden name=sitesearch value=http://sound2gd.wang/>
-<button type=submit class="submit icon-search"></button>
-</form>
-</section>
-<section class=widget>
-<h3 class=widget-title>最近文章</h3>
-<ul class=widget-list>
-<li>
-<a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
-</li>
-</ul>
-</section>
-<section class=widget>
-<h3 class=widget-title><a href=/categories/>分类</a></h3>
-<ul class=widget-list>
-<li><a href=http://sound2gd.wang/categories/clojure/>Clojure (1)</a></li>
-<li><a href=http://sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li>
-</ul>
-</section>
-<section class=widget>
-<h3 class=widget-title><a href=/tags/>标签</a></h3>
-<div class=tagcloud>
-<a href=http://sound2gd.wang/tags/2021/>2021</a>
+<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=http://sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=http://sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=http://sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=http://sound2gd.wang/tags/2021/>2021</a>
 <a href=http://sound2gd.wang/tags/clojure/>Clojure</a>
 <a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
 <a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
@@ -326,18 +35,4 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 <a href=http://sound2gd.wang/tags/%E4%BA%BA%E7%94%9F/>人生</a>
 <a href=http://sound2gd.wang/tags/%E5%B7%A5%E7%A8%8B%E6%8A%80%E6%9C%AF/>工程技术</a>
 <a href=http://sound2gd.wang/tags/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结</a>
-<a href=http://sound2gd.wang/tags/%E6%9D%82%E8%B0%88/>杂谈</a>
-</div>
-</section>
-<section class=widget>
-<h3 class=widget-title>其它</h3>
-<ul class=widget-list>
-<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
-</ul>
-</section>
-</div>
-</div>
-</div>
-</div>
-</body>
-</html>
+<a href=http://sound2gd.wang/tags/%E6%9D%82%E8%B0%88/>杂谈</a></div></section><section class=widget><h3 class=widget-title>其它</h3><ul class=widget-list><li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li></ul></section></div></div></div></div></body></html>

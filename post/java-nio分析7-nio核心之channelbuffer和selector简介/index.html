@@ -1,626 +1,387 @@
-<!doctype html><html lang=en-us>
-<head>
-<meta charset=utf-8>
-<meta http-equiv=x-ua-compatible content="IE=edge">
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介 | Chris的博客</title>
-<meta property="og:title" content="Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介 - Chris的博客">
-<meta property="og:type" content="article">
-<meta property="article:published_time" content="2018-07-10T21:34:17+08:00">
-<meta property="article:modified_time" content="2018-07-10T21:34:17+08:00">
-<meta name=Keywords content="golang,go语言,sound2gd,Chris,java,jvm,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序">
-<meta name=description content="Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介">
-<meta name=author content="Chris Wang">
-<meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/">
-<link rel="shortcut icon" href=/favicon.ico type=image/x-icon>
-<link rel=stylesheet href=/css/normalize.css>
-<link rel=stylesheet href=/css/style.css>
-<script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
-<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet>
-</head>
-<body>
-<header id=header class=clearfix>
-<div class=container>
-<div class=col-group>
-<div class=site-name>
-<a id=logo href=http://sound2gd.wang/>
-Chris的博客
-</a>
-<p class=description>专注于Jvm(openjdk)、Go语言(golang)、效率工具、项目管理、软件架构、金融科技</p>
-</div>
-<div>
-<nav id=nav-menu class=clearfix>
-<a class=current href=http://sound2gd.wang/>首页</a>
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1"><title>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介 | Chris的博客</title><meta property="og:title" content="Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介 - Chris的博客"><meta property="og:type" content="article"><meta property="article:published_time" content="2018-07-10T21:34:17+08:00"><meta property="article:modified_time" content="2018-07-10T21:34:17+08:00"><meta name=Keywords content="golang,go语言,sound2gd,Chris,java,jvm,android,博客,项目管理,金融科技,clojure,软件架构,公众号,小程序"><meta name=description content="Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介"><meta name=author content="Chris Wang"><meta property="og:url" content="http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/"><link rel="shortcut icon" href=/favicon.ico type=image/x-icon><link rel=stylesheet href=/css/normalize.css><link rel=stylesheet href=/css/style.css><script type=text/javascript src=//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js></script>
+<link href=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css rel=stylesheet></head><body><header id=header class=clearfix><div class=container><div class=col-group><div class=site-name><a id=logo href=http://sound2gd.wang/>Chris的博客</a><p class=description>专注于Jvm(openjdk)、Go语言(golang)、效率工具、项目管理、软件架构、金融科技</p></div><div><nav id=nav-menu class=clearfix><a class=current href=http://sound2gd.wang/>首页</a>
 <a href=http://sound2gd.wang/archives/ title=归档>归档</a>
 <a href=http://sound2gd.wang/life/ title=学习>学习</a>
-<a href=http://sound2gd.wang/about/ title=关于>关于</a>
-</nav>
-</div>
-</div>
-</div>
-</header>
-<div id=body>
-<div class=container>
-<div class=col-group>
-<div class=col-8 id=main>
-<div class=res-cons>
-<article class=post>
-<header>
-<h1 class=post-title>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</h1>
-</header>
-<date class="post-meta meta-date">
-2018年7月10日
-</date>
-<div class=post-content>
-<p>上次<a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java-NIO分析-6-Java-NIO中的概念</a>讲到了NIO的设计思想,
-即<code>Doug Lea</code>大佬受<code>AWT</code>启发得到的<strong>事件驱动机制</strong>, 关键点在于</p>
-<ul>
-<li>非阻塞处理器</li>
-<li>事件分发组件</li>
-</ul>
-<p>在NIO的API中，<code>Channel</code>就是实现非阻塞的组件，而事件分发(Dispatcher)使用的是<code>Selector</code>组件，
+<a href=http://sound2gd.wang/about/ title=关于>关于</a></nav></div></div></div></header><div id=body><div class=container><div class=col-group><div class=col-8 id=main><div class=res-cons><article class=post><header><h1 class=post-title>Java NIO分析(7): NIO核心之Channel,Buffer和Selector简介</h1></header><date class="post-meta meta-date">2018年7月10日</date><div class=post-content><p>上次<a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java-NIO分析-6-Java-NIO中的概念</a>讲到了NIO的设计思想,
+即<code>Doug Lea</code>大佬受<code>AWT</code>启发得到的<strong>事件驱动机制</strong>, 关键点在于</p><ul><li>非阻塞处理器</li><li>事件分发组件</li></ul><p>在NIO的API中，<code>Channel</code>就是实现非阻塞的组件，而事件分发(Dispatcher)使用的是<code>Selector</code>组件，
 在传统的I/O流(<code>Stream</code>)是有方向的，而NIO支持双向读写，这样就需要将流中的数据读取到某个缓冲组件里，
-即<code>Buffer</code>组件.</p>
-<p><code>Buffer</code>组件还有个特殊的实现<code>DirectByteBuffer</code>, 可以申请<strong>堆外内存</strong>，关于为什么要申请堆外内存后续会谈。</p>
-<h1 id=1-channel>1. Channel</h1>
-<p><code>Channel</code>是NIO中用来实现非阻塞数据操作的桥梁，笔者猜测是借鉴的<code>Berkly Socket</code>的设计，代表某种通道，
+即<code>Buffer</code>组件.</p><p><code>Buffer</code>组件还有个特殊的实现<code>DirectByteBuffer</code>, 可以申请<strong>堆外内存</strong>，关于为什么要申请堆外内存后续会谈。</p><h1 id=1-channel>1. Channel</h1><p><code>Channel</code>是NIO中用来实现非阻塞数据操作的桥梁，笔者猜测是借鉴的<code>Berkly Socket</code>的设计，代表某种通道，
 和<code>I/O Stream</code>只支持读或者写(单向)不一样，<code>Channel</code>同时支持读和写, 但是只能读和写到<code>Buffer</code>中，因为
-<strong>支持了非阻塞，读出的数据要找个地方临时存放</strong>.</p>
-<p>
-<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/10/20180710220002.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/10/20180710220002.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-</a>
-</p>
-<p>Channel主要实现有:</p>
-<ul>
-<li>SocketChannel</li>
-<li>ServerSocketChannel</li>
-<li>DatagramChannel</li>
-<li>FileChannel</li>
-</ul>
-<p>基本类图如下:</p>
-<p>
-<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/10/20180710222719.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<img class=mx-auto alt=点击查看大图 src="http://img.sound2gd.wang/2018/07/10/20180710222719.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-</a>
-</p>
-<p>以上Channel涵盖了文件，TCP, UDP网络的支持, 也是我们用的最多的。
+<strong>支持了非阻塞，读出的数据要找个地方临时存放</strong>.</p><p><a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/10/20180710220002.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"><img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/10/20180710220002.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"></a></p><p>Channel主要实现有:</p><ul><li>SocketChannel</li><li>ServerSocketChannel</li><li>DatagramChannel</li><li>FileChannel</li></ul><p>基本类图如下:</p><p><a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/10/20180710222719.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"><img class=mx-auto alt=点击查看大图 src="http://img.sound2gd.wang/2018/07/10/20180710222719.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"></a></p><p>以上Channel涵盖了文件，TCP, UDP网络的支持, 也是我们用的最多的。
 <strong>Channel都不是手动new出来的</strong>,基本都是用静态方法Open出来的，或者从<code>BIO</code>的Stream里封装得到的(本质上也是调用某Channel的open方法)。
-比如使用<code>FileChannel</code>来读写文件的一个例子:</p>
-<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
-<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span></code></pre></td>
-<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#998;font-style:italic>/**
-</span><span style=color:#998;font-style:italic> * 测试FileChannel模拟传统IO用竹筒多次取水的过程
-</span><span style=color:#998;font-style:italic> * 
-</span><span style=color:#998;font-style:italic> * @author sound2gd
-</span><span style=color:#998;font-style:italic> *
-</span><span style=color:#998;font-style:italic> */</span>
-<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>FileChannelTest2</span> <span style=color:#000;font-weight:700>{</span>
-
-	<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> Exception<span style=color:#000;font-weight:700>{</span>
-		FileInputStream sr <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> FileInputStream<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;src/com/cris/chapter15/f6/FileChannelTest2.java&#34;</span><span style=color:#000;font-weight:700>);</span>
-		FileChannel fc <span style=color:#000;font-weight:700>=</span> sr<span style=color:#000;font-weight:700>.</span><span style=color:teal>getChannel</span><span style=color:#000;font-weight:700>();</span>
-		ByteBuffer bf <span style=color:#000;font-weight:700>=</span> ByteBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>256<span style=color:#000;font-weight:700>);</span>
-		
-		<span style=color:#998;font-style:italic>//创建Charset对象
-</span><span style=color:#998;font-style:italic></span>		Charset charset <span style=color:#000;font-weight:700>=</span> Charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>forName</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;UTF-8&#34;</span><span style=color:#000;font-weight:700>);</span>
-		CharsetDecoder decoder <span style=color:#000;font-weight:700>=</span> charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>newDecoder</span><span style=color:#000;font-weight:700>();</span>
-		
-		<span style=color:#000;font-weight:700>while</span><span style=color:#000;font-weight:700>((</span>fc<span style=color:#000;font-weight:700>.</span><span style=color:teal>read</span><span style=color:#000;font-weight:700>(</span>bf<span style=color:#000;font-weight:700>))!=-</span>1<span style=color:#000;font-weight:700>){</span>
-			<span style=color:#998;font-style:italic>//锁定Buffer的空白区
-</span><span style=color:#998;font-style:italic></span>			bf<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
-			<span style=color:#998;font-style:italic>//转码
-</span><span style=color:#998;font-style:italic></span>			CharBuffer cbuff <span style=color:#000;font-weight:700>=</span> decoder<span style=color:#000;font-weight:700>.</span><span style=color:teal>decode</span><span style=color:#000;font-weight:700>(</span>bf<span style=color:#000;font-weight:700>);</span>
-			System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span>cbuff<span style=color:#000;font-weight:700>);</span>
-			<span style=color:#998;font-style:italic>//buffer初始化，用于下一次读取
-</span><span style=color:#998;font-style:italic></span>			bf<span style=color:#000;font-weight:700>.</span><span style=color:teal>clear</span><span style=color:#000;font-weight:700>();</span>
-			
-		<span style=color:#000;font-weight:700>}</span>
-		
-	<span style=color:#000;font-weight:700>}</span>
-<span style=color:#000;font-weight:700>}</span>
-</code></pre></td></tr></table>
-</div>
-</div><p>用法还是比较简单的，从Channel读数据到Buffer用<code>read</code>, 从Buffer写数据到Channel用<code>write</code>
-这里的<code>FileChannel</code>就是从<code>FileInputStream</code>上得到的, 查看其源码:</p>
-<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
-<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
-</span></code></pre></td>
-<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java>    <span style=color:#000;font-weight:700>public</span> FileChannel <span style=color:#900;font-weight:700>getChannel</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>{</span>
-        <span style=color:#000;font-weight:700>synchronized</span> <span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-            <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>channel <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                channel <span style=color:#000;font-weight:700>=</span> FileChannelImpl<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>(</span>fd<span style=color:#000;font-weight:700>,</span> path<span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>true</span><span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>);</span>
-            <span style=color:#000;font-weight:700>}</span>
-            <span style=color:#000;font-weight:700>return</span> channel<span style=color:#000;font-weight:700>;</span>
-        <span style=color:#000;font-weight:700>}</span>
-    <span style=color:#000;font-weight:700>}</span>
-</code></pre></td></tr></table>
-</div>
-</div><p>可以看到，还是调用了FileChannelImpl的open方法</p>
-<h2 id=scatter--gather>Scatter && Gather</h2>
-<p>上面的类图还可以看到<code>ScatteringByteChannel</code>和<code>GatheringByteChannel</code>,它们分别代表<code>Scatter</code>和<code>Gather</code>操作
+比如使用<code>FileChannel</code>来读写文件的一个例子:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#998;font-style:italic>/**
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> * 测试FileChannel模拟传统IO用竹筒多次取水的过程
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> * 
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> * @author sound2gd
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> *
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> */</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>FileChannelTest2</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> Exception<span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>		FileInputStream sr <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> FileInputStream<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;src/com/cris/chapter15/f6/FileChannelTest2.java&#34;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		FileChannel fc <span style=color:#000;font-weight:700>=</span> sr<span style=color:#000;font-weight:700>.</span><span style=color:teal>getChannel</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>		ByteBuffer bf <span style=color:#000;font-weight:700>=</span> ByteBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>256<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		
+</span></span><span style=display:flex><span>		<span style=color:#998;font-style:italic>//创建Charset对象
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>		Charset charset <span style=color:#000;font-weight:700>=</span> Charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>forName</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;UTF-8&#34;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		CharsetDecoder decoder <span style=color:#000;font-weight:700>=</span> charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>newDecoder</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>		
+</span></span><span style=display:flex><span>		<span style=color:#000;font-weight:700>while</span><span style=color:#000;font-weight:700>((</span>fc<span style=color:#000;font-weight:700>.</span><span style=color:teal>read</span><span style=color:#000;font-weight:700>(</span>bf<span style=color:#000;font-weight:700>))!=-</span>1<span style=color:#000;font-weight:700>){</span>
+</span></span><span style=display:flex><span>			<span style=color:#998;font-style:italic>//锁定Buffer的空白区
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>			bf<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>			<span style=color:#998;font-style:italic>//转码
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>			CharBuffer cbuff <span style=color:#000;font-weight:700>=</span> decoder<span style=color:#000;font-weight:700>.</span><span style=color:teal>decode</span><span style=color:#000;font-weight:700>(</span>bf<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>			System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span>cbuff<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>			<span style=color:#998;font-style:italic>//buffer初始化，用于下一次读取
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>			bf<span style=color:#000;font-weight:700>.</span><span style=color:teal>clear</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>			
+</span></span><span style=display:flex><span>		<span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>		
+</span></span><span style=display:flex><span>	<span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>用法还是比较简单的，从Channel读数据到Buffer用<code>read</code>, 从Buffer写数据到Channel用<code>write</code>
+这里的<code>FileChannel</code>就是从<code>FileInputStream</code>上得到的, 查看其源码:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> FileChannel <span style=color:#900;font-weight:700>getChannel</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>synchronized</span> <span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>            <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>channel <span style=color:#000;font-weight:700>==</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                channel <span style=color:#000;font-weight:700>=</span> FileChannelImpl<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>(</span>fd<span style=color:#000;font-weight:700>,</span> path<span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>true</span><span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>,</span> <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>            <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>            <span style=color:#000;font-weight:700>return</span> channel<span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>可以看到，还是调用了FileChannelImpl的open方法</p><h2 id=scatter--gather>Scatter && Gather</h2><p>上面的类图还可以看到<code>ScatteringByteChannel</code>和<code>GatheringByteChannel</code>,它们分别代表<code>Scatter</code>和<code>Gather</code>操作
 Scatter是分散操作，可以将一个Channel里的数据读取到多个Buffer
-Gather是聚合操作，可以将多个Buffer的数据读取到一个Channel</p>
-<p>在网络编程中这俩是常用操作，比如http协议的解析通常会将header和body分散到俩<code>Buffer</code>,方便后续处理
-Scatter和Gather的细节限于篇幅不展开叙述，感兴趣的读者可以自行了解</p>
-<h1 id=2-buffer>2. Buffer</h1>
-<p><code>Buffer</code>是一个容器，本质上就是一个数组.用于接受从Channel里传过来的数据
-Buffer的实现常见有:</p>
-<p>
-<a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/11/20180711215338.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-<img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/11/20180711215338.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10">
-</a>
-</p>
-<p>看名字就知道是存放什么类型数据的<code>Buffer</code>.
-Buffer的创建时通过Buffer类的静态方法来创建的。 Buffer有三个核心概念:</p>
-<ul>
-<li>position:位置，用于指明下一个可以被读出的或者写入的缓冲区位置索引</li>
-<li>limit:界限，第一个不应该被读出或者写入的缓冲区位置索引</li>
-<li>capacity:容量，创建后不能改变</li>
-</ul>
-<p>Buffer类有一个实例方法:flip()。其作用是将limit设置为position所在的位置，然后将position置为0 ，这就使得Buffer的读写指针又回到了开始位置。 clear()方法就是将position置为0，limit置为capacity.
+Gather是聚合操作，可以将多个Buffer的数据读取到一个Channel</p><p>在网络编程中这俩是常用操作，比如http协议的解析通常会将header和body分散到俩<code>Buffer</code>,方便后续处理
+Scatter和Gather的细节限于篇幅不展开叙述，感兴趣的读者可以自行了解</p><h1 id=2-buffer>2. Buffer</h1><p><code>Buffer</code>是一个容器，本质上就是一个数组.用于接受从Channel里传过来的数据
+Buffer的实现常见有:</p><p><a data-fancybox=gallery href="http://img.sound2gd.wang/2018/07/11/20180711215338.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"><img class=mx-auto alt src="http://img.sound2gd.wang/2018/07/11/20180711215338.png?watermark/2/text/U291bmQyZ2TnmoTljZrlrqIK/font/5Lu_5a6L/fontsize/320/fill/IzEzMjRFQg==/dissolve/60/gravity/SouthEast/dx/0/dy/-10"></a></p><p>看名字就知道是存放什么类型数据的<code>Buffer</code>.
+Buffer的创建时通过Buffer类的静态方法来创建的。 Buffer有三个核心概念:</p><ul><li>position:位置，用于指明下一个可以被读出的或者写入的缓冲区位置索引</li><li>limit:界限，第一个不应该被读出或者写入的缓冲区位置索引</li><li>capacity:容量，创建后不能改变</li></ul><p>Buffer类有一个实例方法:flip()。其作用是将limit设置为position所在的位置，然后将position置为0 ，这就使得Buffer的读写指针又回到了开始位置。 clear()方法就是将position置为0，limit置为capacity.
 为啥要有这种操作？因为Buffer是支持读和写的，写完了给别的地方用就要flip, 免得数据处理出错
-下面以<code>CharBuffer</code>为例举个简单的例子</p>
-<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
-<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
-</span></code></pre></td>
-<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-		<span style=color:#998;font-style:italic>// 创建Buffer
-</span><span style=color:#998;font-style:italic></span>		CharBuffer buffer <span style=color:#000;font-weight:700>=</span> CharBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>8<span style=color:#000;font-weight:700>);</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的容量:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>capacity</span><span style=color:#000;font-weight:700>());</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的位置:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的界限:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>limit</span><span style=color:#000;font-weight:700>());</span>
-
-		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;s&#39;</span><span style=color:#000;font-weight:700>);</span>
-		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;o&#39;</span><span style=color:#000;font-weight:700>);</span>
-		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;u&#39;</span><span style=color:#000;font-weight:700>);</span>
-		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;n&#39;</span><span style=color:#000;font-weight:700>);</span>
-		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;d&#39;</span><span style=color:#000;font-weight:700>);</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;加入5个元素后position:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
-
-		<span style=color:#998;font-style:italic>// 调用flip
-</span><span style=color:#998;font-style:italic></span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的容量:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>capacity</span><span style=color:#000;font-weight:700>());</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的位置:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的界限:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>limit</span><span style=color:#000;font-weight:700>());</span>
-
-		<span style=color:#998;font-style:italic>// 取出第一个元素
-</span><span style=color:#998;font-style:italic></span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer中的元素:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>());</span>
-		<span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>hasRemaining</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
-			System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>());</span>
-		<span style=color:#000;font-weight:700>}</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>();</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;取出第一个元素后position=&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
-
-		<span style=color:#998;font-style:italic>// 调用clear
-</span><span style=color:#998;font-style:italic></span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>clear</span><span style=color:#000;font-weight:700>();</span>
-		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;第3个元素&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>(</span>2<span style=color:#000;font-weight:700>));</span>
-
-	<span style=color:#000;font-weight:700>}</span>
-</code></pre></td></tr></table>
-</div>
-</div><p>输出结果请读者自行理解下</p>
-<h2 id=directbytebuffer>DirectByteBuffer</h2>
-<p>上面还有个特殊的类，就是这个<code>DirectByteBuffer</code>, 这个是有名的<code>冰山对象</code>，
+下面以<code>CharBuffer</code>为例举个简单的例子</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>		<span style=color:#998;font-style:italic>// 创建Buffer
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>		CharBuffer buffer <span style=color:#000;font-weight:700>=</span> CharBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>8<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的容量:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>capacity</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的位置:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的界限:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>limit</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;s&#39;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;o&#39;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;u&#39;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;n&#39;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>put</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#39;d&#39;</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;加入5个元素后position:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#998;font-style:italic>// 调用flip
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的容量:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>capacity</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的位置:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer的界限:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>limit</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#998;font-style:italic>// 取出第一个元素
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;buffer中的元素:&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		<span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>hasRemaining</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>			System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>print</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>		<span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;取出第一个元素后position=&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>position</span><span style=color:#000;font-weight:700>());</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#998;font-style:italic>// 调用clear
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>		buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>clear</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>		System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;第3个元素&#34;</span> <span style=color:#000;font-weight:700>+</span> buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>get</span><span style=color:#000;font-weight:700>(</span>2<span style=color:#000;font-weight:700>));</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#000;font-weight:700>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>输出结果请读者自行理解下</p><h2 id=directbytebuffer>DirectByteBuffer</h2><p>上面还有个特殊的类，就是这个<code>DirectByteBuffer</code>, 这个是有名的<code>冰山对象</code>，
 分配DirectByteBuffer的时候，JVM是申请一块直接内存(堆外), 然后地址关联到<code>DirectByteBufer</code>里的address
 它的回收器<code>sun.misc.Cleaner</code>使用的是<code>虚引用</code>, 当DirectByteBuffer被回收的时候，其关联的堆外内存也会使用<code>Unsafe</code>释放掉
-虽然在DireactByteBuffer堆内占用内存少，但是可能关联一块非常大的堆外内存，和冰山一样，所以称为冰山对象</p>
-<p>后面还会对DirectByteBuffer进行解析，这个是NIO的一个重要feature之一</p>
-<h1 id=3-selector>3. Selector</h1>
-<p><code>Selector</code>是NIO中用来实现<code>事件分发</code>的组件,受<code>AWT线程</code>的启发，用于接收I/O事件并分发到合适的处理器。</p>
-<p><code>Selector</code>底层使用的依然是操作系统的<code>select</code>,<code>poll</code>和<code>epoll</code>系统调用，支持使用一个线程来监听多个fd的I/O事件, 也即前面讲的<code>I/O多路复用</code>模型.</p>
-<p><code>Selector</code>可以同时监控多个<code>SelectableChannel</code>的IO状况，是非阻塞IO的核心，一个Selector 有三个SelectionKey集合</p>
-<ul>
-<li>所有的SelectionKey集合，代表了注册在该Selector上的Channel</li>
-<li>被选择的SelectionKey集合:代表了所有可以通过select 方法获取的，需要进行IO处理的Channel</li>
-<li>被取消的SelectionKey集合：代表了所有被取消注册关系的Channel,在下次执行select方法时。这些 Channel对应的SelectKey会被彻底删除</li>
-</ul>
-<p><code>SelectableChannel</code>代表可以支持非阻塞IO操作的Channel对象，它可以被注册到Selector上， 这种注册关系由<code>SelectionKey</code>实例表示</p>
-<p>下面举个聊天室的例子</p>
-<div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4>
-<table style=border-spacing:0;padding:0;margin:0;border:0;width:auto;overflow:auto;display:block><tr><td style=vertical-align:top;padding:0;margin:0;border:0>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  1
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  2
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  3
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  4
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  5
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  6
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  7
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  8
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">  9
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 10
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 11
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 12
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 13
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 14
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 15
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 16
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 17
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 18
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 19
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 20
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 21
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 22
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 23
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 24
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 25
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 26
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 27
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 28
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 29
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 30
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 31
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 32
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 33
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 34
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 35
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 36
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 37
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 38
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 39
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 40
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 41
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 42
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 43
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 44
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 45
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 46
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 47
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 48
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 49
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 50
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 51
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 52
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 53
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 54
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 55
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 56
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 57
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 58
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 59
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 60
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 61
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 62
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 63
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 64
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 65
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 66
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 67
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 68
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 69
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 70
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 71
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 72
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 73
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 74
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 75
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 76
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 77
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 78
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 79
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 80
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 81
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 82
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 83
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 84
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 85
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 86
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 87
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 88
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 89
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 90
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 91
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 92
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 93
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 94
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 95
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 96
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 97
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 98
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 99
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">100
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">101
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">102
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">103
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">104
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">105
-</span><span style="margin-right:.4em;padding:0 .4em;color:#7f7f7f">106
-</span></code></pre></td>
-<td style=vertical-align:top;padding:0;margin:0;border:0;width:100%>
-<pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.net.InetAddress</span><span style=color:#000;font-weight:700>;</span>
-<span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.net.InetSocketAddress</span><span style=color:#000;font-weight:700>;</span>
-<span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.ByteBuffer</span><span style=color:#000;font-weight:700>;</span>
-<span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.channels.*</span><span style=color:#000;font-weight:700>;</span>
-<span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.charset.Charset</span><span style=color:#000;font-weight:700>;</span>
-<span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.charset.StandardCharsets</span><span style=color:#000;font-weight:700>;</span>
-
-<span style=color:#998;font-style:italic>/**
-</span><span style=color:#998;font-style:italic> * 使用NIO来实现聊天室
-</span><span style=color:#998;font-style:italic> */</span>
-<span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>NServer</span> <span style=color:#000;font-weight:700>{</span>
-
-    <span style=color:#998;font-style:italic>// 用于检测所有Channel状态的selector
-</span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> Selector selector <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>;</span>
-
-    <span style=color:#998;font-style:italic>// 定义实现编码，解码的字符集对象
-</span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> Charset charset <span style=color:#000;font-weight:700>=</span> StandardCharsets<span style=color:#000;font-weight:700>.</span><span style=color:teal>UTF_8</span><span style=color:#000;font-weight:700>;</span>
-
-    <span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>init</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>throws</span> Exception <span style=color:#000;font-weight:700>{</span>
-        selector <span style=color:#000;font-weight:700>=</span> Selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>();</span>
-        <span style=color:#998;font-style:italic>//通过open方法来打开一个未绑定的ServerSocketChannel实例
-</span><span style=color:#998;font-style:italic></span>        ServerSocketChannel server <span style=color:#000;font-weight:700>=</span> ServerSocketChannel<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>();</span>
-        InetSocketAddress isa <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> InetSocketAddress<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;127.0.0.1&#34;</span><span style=color:#000;font-weight:700>,</span> 8888<span style=color:#000;font-weight:700>);</span>
-        <span style=color:#998;font-style:italic>// 绑定到指定地址
-</span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>bind</span><span style=color:#000;font-weight:700>(</span>isa<span style=color:#000;font-weight:700>);</span>
-        <span style=color:#998;font-style:italic>// 设置以非阻塞的方式工作
-</span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>configureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>);</span>
-        <span style=color:#998;font-style:italic>// 将Server注册到指定的Selector对象
-</span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>register</span><span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>,</span> SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_ACCEPT</span><span style=color:#000;font-weight:700>);</span>
-
-        <span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>select</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-            <span style=color:#998;font-style:italic>// 依次处理selector上的已选择的SelectionKey
-</span><span style=color:#998;font-style:italic></span>            <span style=color:#000;font-weight:700>for</span> <span style=color:#000;font-weight:700>(</span>SelectionKey sk <span style=color:#000;font-weight:700>:</span> selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>selectedKeys</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
-                <span style=color:#998;font-style:italic>//从selector上的已选择key集中删除正在处理的SelectionKey
-</span><span style=color:#998;font-style:italic></span>                selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>selectedKeys</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>remove</span><span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>);</span>
-                <span style=color:#998;font-style:italic>//如果sk对应的Channel包含客户端的连接请求
-</span><span style=color:#998;font-style:italic></span>                <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>isAcceptable</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
-                    <span style=color:#998;font-style:italic>//调用accept方法接受此连接,产生服务器端的SocketChannel
-</span><span style=color:#998;font-style:italic></span>                    SocketChannel accept <span style=color:#000;font-weight:700>=</span> server<span style=color:#000;font-weight:700>.</span><span style=color:teal>accept</span><span style=color:#000;font-weight:700>();</span>
-                    <span style=color:#998;font-style:italic>//采用非阻塞模式
-</span><span style=color:#998;font-style:italic></span>                    accept<span style=color:#000;font-weight:700>.</span><span style=color:teal>configureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>);</span>
-                    <span style=color:#998;font-style:italic>//将该SocketChannel注册到selector
-</span><span style=color:#998;font-style:italic></span>                    accept<span style=color:#000;font-weight:700>.</span><span style=color:teal>register</span><span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>,</span> SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_READ</span><span style=color:#000;font-weight:700>);</span>
-                    <span style=color:#998;font-style:italic>//将sk对应的Channel设置成准备接受其他请求
-</span><span style=color:#998;font-style:italic></span>                    sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>interestOps</span><span style=color:#000;font-weight:700>(</span>SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_ACCEPT</span><span style=color:#000;font-weight:700>);</span>
-
-                <span style=color:#000;font-weight:700>}</span>
-
-                <span style=color:#998;font-style:italic>// 如果sk对应的Channel有数据需要读取
-</span><span style=color:#998;font-style:italic></span>                <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>isReadable</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
-                    <span style=color:#998;font-style:italic>// 获取该SelctionKey对应的Channel,该Channel有可读的数据
-</span><span style=color:#998;font-style:italic></span>                    SocketChannel channel <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>(</span>SocketChannel<span style=color:#000;font-weight:700>)</span> sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>();</span>
-                    <span style=color:#998;font-style:italic>//定义准备执行读取数据的ByteBuffer
-</span><span style=color:#998;font-style:italic></span>                    ByteBuffer buffer <span style=color:#000;font-weight:700>=</span> ByteBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>1024<span style=color:#000;font-weight:700>);</span>
-
-                    String content <span style=color:#000;font-weight:700>=</span> <span style=color:#d14>&#34;&#34;</span><span style=color:#000;font-weight:700>;</span>
-                    <span style=color:#998;font-style:italic>//开始读取数据
-</span><span style=color:#998;font-style:italic></span>                    <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
-                        <span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>channel<span style=color:#000;font-weight:700>.</span><span style=color:teal>read</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                            buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
-                            content <span style=color:#000;font-weight:700>+=</span> charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>decode</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>);</span>
-                        <span style=color:#000;font-weight:700>}</span>
-                        <span style=color:#998;font-style:italic>//打印从该SK对应的Channel读取到的数据
-</span><span style=color:#998;font-style:italic></span>                        System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;读取的数据&#34;</span> <span style=color:#000;font-weight:700>+</span> content<span style=color:#000;font-weight:700>);</span>
-                        <span style=color:#998;font-style:italic>//将sk对应的channel设置成准备下一次读取
-</span><span style=color:#998;font-style:italic></span>                        sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>interestOps</span><span style=color:#000;font-weight:700>(</span>SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_READ</span><span style=color:#000;font-weight:700>);</span>
-                    <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>Exception e<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                        <span style=color:#998;font-style:italic>//如果捕获到了该SK对应的Channel出现了异常，即表明
-</span><span style=color:#998;font-style:italic></span>                        <span style=color:#998;font-style:italic>//该Channel对应的Client出现了问题，所以从selctor中取消该Sk的注册
-</span><span style=color:#998;font-style:italic></span>
-                        sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>cancel</span><span style=color:#000;font-weight:700>();</span>
-                        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>!=</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                            sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>close</span><span style=color:#000;font-weight:700>();</span>
-                        <span style=color:#000;font-weight:700>}</span>
-
-                    <span style=color:#000;font-weight:700>}</span>
-                    <span style=color:#998;font-style:italic>//如果content的长度大于0,即聊天信息不为空，
-</span><span style=color:#998;font-style:italic></span>                    <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>content<span style=color:#000;font-weight:700>.</span><span style=color:teal>length</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                        <span style=color:#998;font-style:italic>//遍历该selecor里注册的所有SelectionKey
-</span><span style=color:#998;font-style:italic></span>                        <span style=color:#000;font-weight:700>for</span> <span style=color:#000;font-weight:700>(</span>SelectionKey key <span style=color:#000;font-weight:700>:</span> selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>keys</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
-                            <span style=color:#998;font-style:italic>//获取该key对应的channel
-</span><span style=color:#998;font-style:italic></span>                            SelectableChannel target <span style=color:#000;font-weight:700>=</span> key<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>();</span>
-                            <span style=color:#998;font-style:italic>//如果该Channel是SocketChannel对象
-</span><span style=color:#998;font-style:italic></span>                            <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>target <span style=color:#000;font-weight:700>instanceof</span> SocketChannel<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-                                <span style=color:#998;font-style:italic>// 将读取到的内容写入该channel中
-</span><span style=color:#998;font-style:italic></span>                                SocketChannel dest <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>(</span>SocketChannel<span style=color:#000;font-weight:700>)</span> target<span style=color:#000;font-weight:700>;</span>
-                                dest<span style=color:#000;font-weight:700>.</span><span style=color:teal>write</span><span style=color:#000;font-weight:700>(</span>charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>encode</span><span style=color:#000;font-weight:700>(</span>content<span style=color:#000;font-weight:700>));</span>
-                            <span style=color:#000;font-weight:700>}</span>
-                        <span style=color:#000;font-weight:700>}</span>
-                    <span style=color:#000;font-weight:700>}</span>
-
-                <span style=color:#000;font-weight:700>}</span>
-            <span style=color:#000;font-weight:700>}</span>
-        <span style=color:#000;font-weight:700>}</span>
-
-    <span style=color:#000;font-weight:700>}</span>
-
-    <span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-        <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
-            <span style=color:#000;font-weight:700>new</span> NServer<span style=color:#000;font-weight:700>().</span><span style=color:teal>init</span><span style=color:#000;font-weight:700>();</span>
-        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>Exception e<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
-            e<span style=color:#000;font-weight:700>.</span><span style=color:teal>printStackTrace</span><span style=color:#000;font-weight:700>();</span>
-        <span style=color:#000;font-weight:700>}</span>
-    <span style=color:#000;font-weight:700>}</span>
-
-<span style=color:#000;font-weight:700>}</span>
-</code></pre></td></tr></table>
-</div>
-</div><p>使用<code>nc localhost 8888</code>就可以测试了，多开几个终端以模拟多个客户端。</p>
-<p>这个例子里使用了<code>ServerSocketChannel</code>，类似于BIO中<code>ServerSocket</code>,用于监听某个地址和端口, 是TCP服务端的代表.同时还可以看到accept之后得到了一个<code>SocketChannel</code>, 代表一个TCP socket通道.</p>
-<p>我们均使用了非阻塞模式, 在read的时候如果读取的数据不够，也不会阻塞调用线程。</p>
-<h1 id=4-总结>4. 总结</h1>
-<p>本节介绍了NIO的核心Channel, Buffer和Selector，它们的设计意图和解决的问题,同时举了些简单的例子来说明用法。</p>
-<p>NIO的根本还是I/O多路复用, 操作系统告诉你哪个fd可读可写，内核帮你做了<code>Event Loop</code>,比在应用层用户空间做无疑是提升了太多的。</p>
-</div>
-<div class=post-archive>
-<ul class=post-copyright>
-<li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li>
-<li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/</a></li>
-<li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li>
-</ul>
-</div>
-<br>
-<div class=post-archive>
-<h2>See Also</h2>
-<ul class=listing>
-<li><a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java NIO分析(6): 从BIO到NIO-设计和概念</a></li>
-<li><a href=/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(5): I/O多路复用之epoll系统调用</a></li>
-<li><a href=/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(4): I/O多路复用之poll系统调用</a></li>
-<li><a href=/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(3): I/O多路复用之select系统调用</a></li>
-<li><a href=/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/>Java NIO分析(2): I/O多路复用历史杂谈</a></li>
-</ul>
-</div>
-<div class="post-meta meta-tags">
-<ul class=clearfix>
-<li><a href=/tags/nio>NIO</a></li>
-</ul>
-</div>
-</article>
-<div class="post bg-white">
-<script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script>
-</div>
-</div>
-<footer id=footer>
-<div>
-&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
-| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a>
-</div>
-<br>
-<div>
-<div class=github-badge>
-<a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
-</div>
-<div class=github-badge>
-<a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
-</div>
-</div>
-</footer>
-<script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[['$','$']],processEscapes:!0}}</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
+虽然在DireactByteBuffer堆内占用内存少，但是可能关联一块非常大的堆外内存，和冰山一样，所以称为冰山对象</p><p>后面还会对DirectByteBuffer进行解析，这个是NIO的一个重要feature之一</p><h1 id=3-selector>3. Selector</h1><p><code>Selector</code>是NIO中用来实现<code>事件分发</code>的组件,受<code>AWT线程</code>的启发，用于接收I/O事件并分发到合适的处理器。</p><p><code>Selector</code>底层使用的依然是操作系统的<code>select</code>,<code>poll</code>和<code>epoll</code>系统调用，支持使用一个线程来监听多个fd的I/O事件, 也即前面讲的<code>I/O多路复用</code>模型.</p><p><code>Selector</code>可以同时监控多个<code>SelectableChannel</code>的IO状况，是非阻塞IO的核心，一个Selector 有三个SelectionKey集合</p><ul><li>所有的SelectionKey集合，代表了注册在该Selector上的Channel</li><li>被选择的SelectionKey集合:代表了所有可以通过select 方法获取的，需要进行IO处理的Channel</li><li>被取消的SelectionKey集合：代表了所有被取消注册关系的Channel,在下次执行select方法时。这些 Channel对应的SelectKey会被彻底删除</li></ul><p><code>SelectableChannel</code>代表可以支持非阻塞IO操作的Channel对象，它可以被注册到Selector上， 这种注册关系由<code>SelectionKey</code>实例表示</p><p>下面举个聊天室的例子</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  1
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  2
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  5
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  6
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  8
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  9
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 10
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 11
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 12
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 13
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 14
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 15
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 16
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 17
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 18
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 19
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 20
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 21
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 22
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 23
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 24
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 25
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 26
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 27
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 28
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 29
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 30
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 31
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 32
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 33
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 34
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 35
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 36
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 37
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 38
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 39
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 40
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 41
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 42
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 43
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 44
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 45
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 46
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 47
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 48
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 49
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 50
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 51
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 52
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 53
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 54
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 55
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 56
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 57
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 58
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 59
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 60
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 61
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 62
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 63
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 64
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 65
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 66
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 67
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 68
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 69
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 70
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 71
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 72
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 73
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 74
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 75
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 76
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 77
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 78
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 79
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 80
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 81
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 82
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 83
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 84
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 85
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 86
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 87
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 88
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 89
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 90
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 91
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 92
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 93
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 94
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 95
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 96
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 97
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 98
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 99
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">100
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">101
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">102
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">103
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">104
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">105
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">106
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.net.InetAddress</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.net.InetSocketAddress</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.ByteBuffer</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.channels.*</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.charset.Charset</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>import</span> <span style=color:#555>java.nio.charset.StandardCharsets</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#998;font-style:italic>/**
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> * 使用NIO来实现聊天室
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic> */</span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>NServer</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#998;font-style:italic>// 用于检测所有Channel状态的selector
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> Selector selector <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#998;font-style:italic>// 定义实现编码，解码的字符集对象
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> Charset charset <span style=color:#000;font-weight:700>=</span> StandardCharsets<span style=color:#000;font-weight:700>.</span><span style=color:teal>UTF_8</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>init</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>throws</span> Exception <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>        selector <span style=color:#000;font-weight:700>=</span> Selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>        <span style=color:#998;font-style:italic>//通过open方法来打开一个未绑定的ServerSocketChannel实例
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>        ServerSocketChannel server <span style=color:#000;font-weight:700>=</span> ServerSocketChannel<span style=color:#000;font-weight:700>.</span><span style=color:teal>open</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>        InetSocketAddress isa <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> InetSocketAddress<span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;127.0.0.1&#34;</span><span style=color:#000;font-weight:700>,</span> 8888<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>        <span style=color:#998;font-style:italic>// 绑定到指定地址
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>bind</span><span style=color:#000;font-weight:700>(</span>isa<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>        <span style=color:#998;font-style:italic>// 设置以非阻塞的方式工作
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>configureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>        <span style=color:#998;font-style:italic>// 将Server注册到指定的Selector对象
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>        server<span style=color:#000;font-weight:700>.</span><span style=color:teal>register</span><span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>,</span> SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_ACCEPT</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>select</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>            <span style=color:#998;font-style:italic>// 依次处理selector上的已选择的SelectionKey
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>            <span style=color:#000;font-weight:700>for</span> <span style=color:#000;font-weight:700>(</span>SelectionKey sk <span style=color:#000;font-weight:700>:</span> selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>selectedKeys</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                <span style=color:#998;font-style:italic>//从selector上的已选择key集中删除正在处理的SelectionKey
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>selectedKeys</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>remove</span><span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                <span style=color:#998;font-style:italic>//如果sk对应的Channel包含客户端的连接请求
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>isAcceptable</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//调用accept方法接受此连接,产生服务器端的SocketChannel
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    SocketChannel accept <span style=color:#000;font-weight:700>=</span> server<span style=color:#000;font-weight:700>.</span><span style=color:teal>accept</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//采用非阻塞模式
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    accept<span style=color:#000;font-weight:700>.</span><span style=color:teal>configureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#000;font-weight:700>false</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//将该SocketChannel注册到selector
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    accept<span style=color:#000;font-weight:700>.</span><span style=color:teal>register</span><span style=color:#000;font-weight:700>(</span>selector<span style=color:#000;font-weight:700>,</span> SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_READ</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//将sk对应的Channel设置成准备接受其他请求
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>interestOps</span><span style=color:#000;font-weight:700>(</span>SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_ACCEPT</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                <span style=color:#998;font-style:italic>// 如果sk对应的Channel有数据需要读取
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>isReadable</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>// 获取该SelctionKey对应的Channel,该Channel有可读的数据
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    SocketChannel channel <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>(</span>SocketChannel<span style=color:#000;font-weight:700>)</span> sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//定义准备执行读取数据的ByteBuffer
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    ByteBuffer buffer <span style=color:#000;font-weight:700>=</span> ByteBuffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>allocate</span><span style=color:#000;font-weight:700>(</span>1024<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                    String content <span style=color:#000;font-weight:700>=</span> <span style=color:#d14>&#34;&#34;</span><span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//开始读取数据
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                        <span style=color:#000;font-weight:700>while</span> <span style=color:#000;font-weight:700>(</span>channel<span style=color:#000;font-weight:700>.</span><span style=color:teal>read</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                            buffer<span style=color:#000;font-weight:700>.</span><span style=color:teal>flip</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                            content <span style=color:#000;font-weight:700>+=</span> charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>decode</span><span style=color:#000;font-weight:700>(</span>buffer<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>                        <span style=color:#998;font-style:italic>//打印从该SK对应的Channel读取到的数据
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                        System<span style=color:#000;font-weight:700>.</span><span style=color:teal>out</span><span style=color:#000;font-weight:700>.</span><span style=color:teal>println</span><span style=color:#000;font-weight:700>(</span><span style=color:#d14>&#34;读取的数据&#34;</span> <span style=color:#000;font-weight:700>+</span> content<span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                        <span style=color:#998;font-style:italic>//将sk对应的channel设置成准备下一次读取
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                        sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>interestOps</span><span style=color:#000;font-weight:700>(</span>SelectionKey<span style=color:#000;font-weight:700>.</span><span style=color:teal>OP_READ</span><span style=color:#000;font-weight:700>);</span>
+</span></span><span style=display:flex><span>                    <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>Exception e<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                        <span style=color:#998;font-style:italic>//如果捕获到了该SK对应的Channel出现了异常，即表明
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                        <span style=color:#998;font-style:italic>//该Channel对应的Client出现了问题，所以从selctor中取消该Sk的注册
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>
+</span></span><span style=display:flex><span>                        sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>cancel</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                        <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>!=</span> <span style=color:#000;font-weight:700>null</span><span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                            sk<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>().</span><span style=color:teal>close</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                    <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>                    <span style=color:#998;font-style:italic>//如果content的长度大于0,即聊天信息不为空，
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                    <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>content<span style=color:#000;font-weight:700>.</span><span style=color:teal>length</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>&gt;</span> 0<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                        <span style=color:#998;font-style:italic>//遍历该selecor里注册的所有SelectionKey
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                        <span style=color:#000;font-weight:700>for</span> <span style=color:#000;font-weight:700>(</span>SelectionKey key <span style=color:#000;font-weight:700>:</span> selector<span style=color:#000;font-weight:700>.</span><span style=color:teal>keys</span><span style=color:#000;font-weight:700>())</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                            <span style=color:#998;font-style:italic>//获取该key对应的channel
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                            SelectableChannel target <span style=color:#000;font-weight:700>=</span> key<span style=color:#000;font-weight:700>.</span><span style=color:teal>channel</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>                            <span style=color:#998;font-style:italic>//如果该Channel是SocketChannel对象
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                            <span style=color:#000;font-weight:700>if</span> <span style=color:#000;font-weight:700>(</span>target <span style=color:#000;font-weight:700>instanceof</span> SocketChannel<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>                                <span style=color:#998;font-style:italic>// 将读取到的内容写入该channel中
+</span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>                                SocketChannel dest <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>(</span>SocketChannel<span style=color:#000;font-weight:700>)</span> target<span style=color:#000;font-weight:700>;</span>
+</span></span><span style=display:flex><span>                                dest<span style=color:#000;font-weight:700>.</span><span style=color:teal>write</span><span style=color:#000;font-weight:700>(</span>charset<span style=color:#000;font-weight:700>.</span><span style=color:teal>encode</span><span style=color:#000;font-weight:700>(</span>content<span style=color:#000;font-weight:700>));</span>
+</span></span><span style=display:flex><span>                            <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>                        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>                    <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>            <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>main</span><span style=color:#000;font-weight:700>(</span>String<span style=color:#000;font-weight:700>[]</span> args<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>try</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>            <span style=color:#000;font-weight:700>new</span> NServer<span style=color:#000;font-weight:700>().</span><span style=color:teal>init</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>}</span> <span style=color:#000;font-weight:700>catch</span> <span style=color:#000;font-weight:700>(</span>Exception e<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>{</span>
+</span></span><span style=display:flex><span>            e<span style=color:#000;font-weight:700>.</span><span style=color:teal>printStackTrace</span><span style=color:#000;font-weight:700>();</span>
+</span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#000;font-weight:700>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>使用<code>nc localhost 8888</code>就可以测试了，多开几个终端以模拟多个客户端。</p><p>这个例子里使用了<code>ServerSocketChannel</code>，类似于BIO中<code>ServerSocket</code>,用于监听某个地址和端口, 是TCP服务端的代表.同时还可以看到accept之后得到了一个<code>SocketChannel</code>, 代表一个TCP socket通道.</p><p>我们均使用了非阻塞模式, 在read的时候如果读取的数据不够，也不会阻塞调用线程。</p><h1 id=4-总结>4. 总结</h1><p>本节介绍了NIO的核心Channel, Buffer和Selector，它们的设计意图和解决的问题,同时举了些简单的例子来说明用法。</p><p>NIO的根本还是I/O多路复用, 操作系统告诉你哪个fd可读可写，内核帮你做了<code>Event Loop</code>,比在应用层用户空间做无疑是提升了太多的。</p></div><div class=post-archive><ul class=post-copyright><li><strong>原文作者：</strong><a rel=author href=http://sound2gd.wang/>Chris Wang</a></li><li style=word-break:break-all><strong>原文链接：</strong><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/>http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%907-nio%E6%A0%B8%E5%BF%83%E4%B9%8Bchannelbuffer%E5%92%8Cselector%E7%AE%80%E4%BB%8B/</a></li><li><strong>版权声明：</strong>本作品采用<a rel=license href=https://creativecommons.org/licenses/by-nc-nd/4.0/>知识共享署名-非商业性使用-禁止演绎 4.0 国际许可协议</a>进行许可，非商业转载请注明出处（作者，原文链接），商业转载请联系作者获得授权。</li></ul></div><br><div class=post-archive><h2>See Also</h2><ul class=listing><li><a href=/post/java-nio%E5%88%86%E6%9E%906-%E4%BB%8Ebio%E5%88%B0nio-%E8%AE%BE%E8%AE%A1%E5%92%8C%E6%A6%82%E5%BF%B5/>Java NIO分析(6): 从BIO到NIO-设计和概念</a></li><li><a href=/post/java-nio%E5%88%86%E6%9E%905-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bepoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(5): I/O多路复用之epoll系统调用</a></li><li><a href=/post/java-nio%E5%88%86%E6%9E%904-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bpoll%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(4): I/O多路复用之poll系统调用</a></li><li><a href=/post/java-nio%E5%88%86%E6%9E%903-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B9%8Bselect%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/>Java NIO分析(3): I/O多路复用之select系统调用</a></li><li><a href=/post/java-nio%E5%88%86%E6%9E%902-i/o%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%8E%86%E5%8F%B2%E6%9D%82%E8%B0%88/>Java NIO分析(2): I/O多路复用历史杂谈</a></li></ul></div><div class="post-meta meta-tags"><ul class=clearfix><li><a href=/tags/nio>NIO</a></li></ul></div></article><div class="post bg-white"><script src=https://utteranc.es/client.js repo=sound2gd/blog-comments issue-term=pathname theme=github-light crossorigin=anonymous async></script></div></div><footer id=footer><div>&copy; 2022 <a href=http://sound2gd.wang/>Chris的博客 By Chris Wang</a>
+| <a rel=nofollow target=_blank href=http://beian.miit.gov.cn/>浙ICP备18046106号</a></div><br><div><div class=github-badge><a href=https://gohugo.io/ target=_black rel=nofollow><span class=badge-subject>Powered by</span><span class="badge-value bg-blue">Hugo</span></a></div><div class=github-badge><a href=https://github.com/flysnow-org/maupassant-hugo target=_black><span class=badge-subject>Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a></div></div></footer><script type=text/javascript>window.MathJax={tex2jax:{inlineMath:[["$","$"]],processEscapes:!0}}</script><script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script><script src=https://cdn.bootcdn.net/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js></script>
 <a id=rocket href=#top></a>
-<script type=text/javascript src="/js/totop.js?v=0.0.0" async></script>
+<script type=text/javascript src='/js/totop.js?v=0.0.0' async></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N5MSKS0SN8"></script>
-<script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date),gtag('config','G-N5MSKS0SN8',{anonymize_ip:!1})}</script>
-</div>
-<div id=secondary>
-<section class=widget>
-<form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1>
-<input type=text name=q maxlength=20 placeholder=Search>
+<script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-N5MSKS0SN8",{anonymize_ip:!1})}</script></div><div id=secondary><section class=widget><form id=search action=http://sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1><input type=text name=q maxlength=20 placeholder=Search>
 <input type=hidden name=sitesearch value=http://sound2gd.wang/>
-<button type=submit class="submit icon-search"></button>
-</form>
-</section>
-<section class=widget>
-<h3 class=widget-title>最近文章</h3>
-<ul class=widget-list>
-<li>
-<a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a>
-</li>
-<li>
-<a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%909-%E4%BB%8Ebsd-socket%E5%88%B0socketchannel/ title="Java NIO分析(9): 从BSD socket到SocketChannel">Java NIO分析(9): 从BSD socket到SocketChannel</a>
-</li>
-</ul>
-</section>
-<section class=widget>
-<h3 class=widget-title><a href=/categories/>分类</a></h3>
-<ul class=widget-list>
-<li><a href=http://sound2gd.wang/categories/clojure/>Clojure (1)</a></li>
-<li><a href=http://sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li>
-</ul>
-</section>
-<section class=widget>
-<h3 class=widget-title><a href=/tags/>标签</a></h3>
-<div class=tagcloud>
-<a href=http://sound2gd.wang/tags/2021/>2021</a>
+<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=http://sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=http://sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=http://sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li><li><a href=http://sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=http://sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=http://sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=http://sound2gd.wang/tags/2021/>2021</a>
 <a href=http://sound2gd.wang/tags/clojure/>Clojure</a>
 <a href=http://sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
 <a href=http://sound2gd.wang/tags/jvm-java/>JVM JAVA</a>
@@ -629,18 +390,4 @@ Buffer的创建时通过Buffer类的静态方法来创建的。 Buffer有三个�
 <a href=http://sound2gd.wang/tags/%E4%BA%BA%E7%94%9F/>人生</a>
 <a href=http://sound2gd.wang/tags/%E5%B7%A5%E7%A8%8B%E6%8A%80%E6%9C%AF/>工程技术</a>
 <a href=http://sound2gd.wang/tags/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结</a>
-<a href=http://sound2gd.wang/tags/%E6%9D%82%E8%B0%88/>杂谈</a>
-</div>
-</section>
-<section class=widget>
-<h3 class=widget-title>其它</h3>
-<ul class=widget-list>
-<li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li>
-</ul>
-</section>
-</div>
-</div>
-</div>
-</div>
-</body>
-</html>
+<a href=http://sound2gd.wang/tags/%E6%9D%82%E8%B0%88/>杂谈</a></div></section><section class=widget><h3 class=widget-title>其它</h3><ul class=widget-list><li><a href=http://sound2gd.wang/index.xml>文章 RSS</a></li></ul></section></div></div></div></div></body></html>
