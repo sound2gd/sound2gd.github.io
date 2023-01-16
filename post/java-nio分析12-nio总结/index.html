@@ -5,7 +5,7 @@
 <a href=http://sound2gd.wang/about/ title=关于>关于</a></nav></div></div></div></header><div id=body><div class=container><div class=col-group><div class=col-8 id=main><div class=res-cons><article class=post><header><h1 class=post-title>Java NIO分析(12): NIO总结</h1></header><date class="post-meta meta-date">2018年7月31日</date><div class=post-content><p>迟来的总结，NIO系列写了11篇了，本篇做个总结吧
 写这个系列的起因是各个框架比如<code>netty</code>, <code>tomcat</code>, <code>jetty</code>这些高性能框架的
 基石就是<code>NIO</code>, 一直想讲讲它们高性能的原因。</p><h1 id=1-nio网络编程体系>1. NIO网络编程体系</h1><p>本系列主要是讲NIO网络编程相关的，因为Java服务端开发最关心的就是这些。
-<strong>我们记不住孤立的事实， 知识得体系化</strong>. 这里上一张笔者写本系列画的脑图</p><p>![](<a href=http://img.sound2gd.wang/2018/08/06/20180806105257.png-t>http://img.sound2gd.wang/2018/08/06/20180806105257.png-t</a></p><p>笔者先从Unix网络编程开始, 讲了5种IO模型，</p><ul><li>阻塞I/O(blocking I/O)</li><li>非阻塞I/O(non-blocking I/O)</li><li>I/O复用(I/O multiplexing)</li><li>信号驱动式I/O(signal-driven I/O)</li><li>异步I/O(asynchronous I/O)</li></ul><p>并指出所有的I/O模型都要经历2个阶段，即<code>数据准备</code>和<code>内核拷贝数据到应用进程</code>
+<strong>我们记不住孤立的事实， 知识得体系化</strong>. 这里上一张笔者写本系列画的脑图</p><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/08/06/20180806105257.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/08/06/20180806105257.png-t></a></p><p>笔者先从Unix网络编程开始, 讲了5种IO模型，</p><ul><li>阻塞I/O(blocking I/O)</li><li>非阻塞I/O(non-blocking I/O)</li><li>I/O复用(I/O multiplexing)</li><li>信号驱动式I/O(signal-driven I/O)</li><li>异步I/O(asynchronous I/O)</li></ul><p>并指出所有的I/O模型都要经历2个阶段，即<code>数据准备</code>和<code>内核拷贝数据到应用进程</code>
 异步I/O模型虽然效率高，但是编程复杂，在实际用的不算多。前四种模型的区别主要在第一阶段数据准备
 第二阶段拷贝数据都会阻塞。</p><p>I/O多路复用是使用最广泛的I/O模型，内核帮助你完成了<code>Event Loop</code>, 你<code>select</code>之后得到的就是
 已经准备就绪的fd集合.</p><p>接下来研究了下I/O多路复用的历史，知道了没有Socket和select之前的黑历史，全靠进程的fork来完成

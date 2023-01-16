@@ -30,7 +30,7 @@ ClassFile {
     u2             attributes_count;
     attribute_info attributes[attributes_count];
 }
-</code></pre><p>![](<a href=http://img.sound2gd.wang/2018/10/26/WechatIMG136.png-t>http://img.sound2gd.wang/2018/10/26/WechatIMG136.png-t</a></p><p>其中<code>magic</code>代表文件类型，任何文件的前4个字节都是<code>magic number</code>, java的魔数是<code>0xCAFEBABE</code>, 咖啡宝贝, 程序员式的浪漫:)
+</code></pre><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/10/26/WechatIMG136.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/10/26/WechatIMG136.png-t></a></p><p>其中<code>magic</code>代表文件类型，任何文件的前4个字节都是<code>magic number</code>, java的魔数是<code>0xCAFEBABE</code>, 咖啡宝贝, 程序员式的浪漫:)
 <code>minor_version</code>和<code>major_version</code>代表的是class的版本号，虚拟机会根据版本号做一些兼容性判断，比如1.4的虚拟机不能执行1.8的字节码
 后面的<code>this_class</code>,<code>super_class</code>, <code>interfaces</code>, <code>fields</code>, <code>methods</code>存的就是当前类名，父类名，实现的接口们，字段和方法大全，都是诸位
 javaer耳熟能详的东西。</p><h2 id=常量池>常量池</h2><p>上面有一块比较重要，在虚拟机规范里甚至单独提出来作为运行时内存区域的一部分, 这部分就是<code>运行时常量池</code>
