@@ -9,35 +9,35 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 所以Socket发布的时候，是用来做<code>进程间通信(IPC)的</code>.</p><p>放在36年后的今天，这个定义也不过时
 <strong>网络通信其实就是不同机器的不同操作系统上socket之间的通信</strong>.</p><h2 id=11-socket-api怎么玩>1.1 Socket API怎么玩？</h2><p>先放张图，从<a href=https://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/howdosockets.htm>IBM那里的文章</a>抄过来的</p><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/07/16/20180716081628.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/07/16/20180716081628.png-t></a></p><p>这就是典型的socket通信的流程。</p><ol><li>通过socket()函数创建一个socket fd, 代表通信端点</li><li>绑定端口，协议栈，Socket类型(TCP就是流式Socket)</li><li>监听, 完了就可以接口客户端的TCP链接了，这个时候建立的TCP链接和accept的不一样，会存在内核的某个队列里，长度由你们都熟悉的<code>SO_BACKLOG</code>指定</li><li>接收链接</li><li>通信, 愉快的交换数据</li><li>关闭链接</li></ol><p>socket通信需要知道5元组(本地IP+端口，服务器IP+端口，协议)</p><p>话说TCP协议实现上这里有个历史缺陷，也是<code>SYN Flood</code>的攻击原理，在TCP3次握手的时候，假如只握手一次，之后就不管了。那么<code>SYN队列</code>会被撑满，之后就不能建立TCP链接了(一般会被拒绝，看操作系统实现).比较可怕的是这都是发生在内核的，还没到应用层, 开发人员一脸懵逼</p><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/07/16/20180716083309.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/07/16/20180716083309.png-t></a></p><h2 id=12-tcpip发过来的包去哪了>1.2 TCP/IP发过来的包去哪了？</h2><p>TCP/IP协议栈将网络分成四层，分别是:</p><ul><li>应用层: 通常就是指你自己写的程序</li><li>传输层(TCP): 其实传输层协议还有UDP,只是我们平时用得少。TCP是一种面向流的可靠传输</li><li>网络层(IP): 基本就是靠IP协议，知道地址和端口来寻找目标机器</li><li>物理层: 就是光纤，网线这种东西</li></ul><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/07/17/20180717081127.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/07/17/20180717081127.png-t></a></p><p>粗略得讲，IP协议保证网络包通过路由器能投递给目标机器网卡，经过网卡驱动会触发一个中断给
 内核，内核会根据TCP/IP协议栈做CRC校检，然后层层解包还原用户数据,然后复制数据到socket
-的读写缓冲区. 以上操作都是在<strong>内核空间</strong>完成的。</p><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/07/16/20180716224333.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/07/16/20180716224333.png-t></a></p><p>如果socket fd被加入到了多路复用的监听队列里，如<code>epoll_ctl</code>加入的fd,那么在下次<code>epoll_wait</code>的时候，将会返回该socket有数据可读可写, 过程即完整的一次网络I/O事件通知。</p><p>这个时候<strong>用户空间</strong>内的应用进程直接调用socket的read方法，内核就会将数据从socket的读缓冲区复制到应用进程的缓冲区了。</p><h1 id=2-socketchannel详解>2. SocketChannel详解</h1><p><code>SocketChannel</code>是对传统Java Socket API的改进，主要是支持了<strong>非阻塞的读写</strong>。同时改进了传统的单向流API, Channel同时支持读写(其实就是加了个中间层<code>Buffer</code>)。</p><h2 id=21-创建一个socketchannel时做了什么>2.1 创建一个SocketChannel时做了什么</h2><p>通过<code>SocketChannel.open()</code>可以打开一个<code>SocketChannel</code>, 最后还是委托给<code>SelectorProvider</code>的<code>openSocketChannel</code>方法</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+的读写缓冲区. 以上操作都是在<strong>内核空间</strong>完成的。</p><p><a data-fancybox=gallery href=http://img.sound2gd.wang/2018/07/16/20180716224333.png-t><img class=mx-auto alt src=http://img.sound2gd.wang/2018/07/16/20180716224333.png-t></a></p><p>如果socket fd被加入到了多路复用的监听队列里，如<code>epoll_ctl</code>加入的fd,那么在下次<code>epoll_wait</code>的时候，将会返回该socket有数据可读可写, 过程即完整的一次网络I/O事件通知。</p><p>这个时候<strong>用户空间</strong>内的应用进程直接调用socket的read方法，内核就会将数据从socket的读缓冲区复制到应用进程的缓冲区了。</p><h1 id=2-socketchannel详解>2. SocketChannel详解</h1><p><code>SocketChannel</code>是对传统Java Socket API的改进，主要是支持了<strong>非阻塞的读写</strong>。同时改进了传统的单向流API, Channel同时支持读写(其实就是加了个中间层<code>Buffer</code>)。</p><h2 id=21-创建一个socketchannel时做了什么>2.1 创建一个SocketChannel时做了什么</h2><p>通过<code>SocketChannel.open()</code>可以打开一个<code>SocketChannel</code>, 最后还是委托给<code>SelectorProvider</code>的<code>openSocketChannel</code>方法</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#998;font-style:italic>// sun.nio.ch.SelectorProvider
 </span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>public</span> SocketChannel <span style=color:#900;font-weight:700>openSocketChannel</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>throws</span> IOException <span style=color:#000;font-weight:700>{</span>
 </span></span><span style=display:flex><span>        <span style=color:#998;font-style:italic>// 调用SocketChannelImpl的构造器
@@ -67,39 +67,39 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 </span></span><span style=display:flex><span>    
 </span></span><span style=display:flex><span>    <span style=color:#998;font-style:italic>// Due to oddities SO_REUSEADDR on windows reuse is ignored
 </span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>private</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#000;font-weight:700>native</span> <span style=color:#458;font-weight:700>int</span> <span style=color:#900;font-weight:700>socket0</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>boolean</span> preferIPv6<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>boolean</span> stream<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>boolean</span> reuse<span style=color:#000;font-weight:700>);</span>
-</span></span></code></pre></td></tr></table></div></div><p>可以看到，最后还是靠一个native方法<code>socket0</code>来创建socket fd,打开<code>jdk/src/solaris/native/sun/nio/ch/Net.c</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span></span></code></pre></td></tr></table></div></div><p>可以看到，最后还是靠一个native方法<code>socket0</code>来创建socket fd,打开<code>jdk/src/solaris/native/sun/nio/ch/Net.c</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=display:flex><span>JNIEXPORT <span style=color:#458;font-weight:700>int</span> JNICALL
 </span></span><span style=display:flex><span><span style=color:#900;font-weight:700>Java_sun_nio_ch_Net_socket0</span>(JNIEnv <span style=color:#000;font-weight:700>*</span>env, jclass cl, jboolean preferIPv6,
 </span></span><span style=display:flex><span>                            jboolean stream, jboolean reuse)
@@ -134,23 +134,23 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>return</span> fd;
 </span></span><span style=display:flex><span>}
 </span></span></code></pre></td></tr></table></div></div><p>果然，底层还是<code>socket</code>函数，这样一个socket fd就创建好了。</p><p>PS: 其实创建个socket fd操作系统内核做了很多事情的，要判断一大堆东西，还要创建和初始化读写缓冲区，加自旋锁等.</p><h2 id=22-如何实现非阻塞>2.2 如何实现非阻塞</h2><p>正常在c里我们实现非阻塞是靠<code>fcntl</code>这个函数，这个函数全称就是<code>file control</code>,
-通过它可以管理fd的各种属性，比如设置fd的阻塞与否。</p><p><code>fcntl</code>的函数签名为:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+通过它可以管理fd的各种属性，比如设置fd的阻塞与否。</p><p><code>fcntl</code>的函数签名为:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=display:flex><span><span style=color:#999;font-weight:700;font-style:italic>#include</span> <span style=color:#999;font-weight:700;font-style:italic>&lt;fcntl.h&gt;</span><span style=color:#999;font-weight:700;font-style:italic>
 </span></span></span><span style=display:flex><span><span style=color:#999;font-weight:700;font-style:italic></span>
 </span></span><span style=display:flex><span><span style=color:#458;font-weight:700>int</span> <span style=color:#900;font-weight:700>fcntl</span>(<span style=color:#458;font-weight:700>int</span> fildes, <span style=color:#458;font-weight:700>int</span> cmd, ...);
 </span></span></code></pre></td></tr></table></div></div><p>第一个参数是传入的fd, 第二个参数是操作类型，后面是flag
-要设置非阻塞，操作类型是<code>F_SETFL</code>和<code>F_GETFL</code>,flag是<code>O_NONBLOCK</code></p><p>那么JVM是怎么做的呢，在SocketChannel上有一个<code>configureBlocking</code>函数，这个函数是设置当前<code>SocketChannel</code>是否是阻塞的，和selector一起用的时候一定要设置成非阻塞才有意义, 阻塞的话就不需要IO多路复用的事件通知了。</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+要设置非阻塞，操作类型是<code>F_SETFL</code>和<code>F_GETFL</code>,flag是<code>O_NONBLOCK</code></p><p>那么JVM是怎么做的呢，在SocketChannel上有一个<code>configureBlocking</code>函数，这个函数是设置当前<code>SocketChannel</code>是否是阻塞的，和selector一起用的时候一定要设置成非阻塞才有意义, 阻塞的话就不需要IO多路复用的事件通知了。</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#998;font-style:italic>// java.nio.channels.spi.AbstractSelectableChannel
 </span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>final</span> SelectableChannel <span style=color:#900;font-weight:700>configureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>boolean</span> block<span style=color:#000;font-weight:700>)</span>
 </span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>throws</span> IOException
@@ -161,37 +161,37 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 </span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>...</span>
 </span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>return</span> <span style=color:#000;font-weight:700>this</span><span style=color:#000;font-weight:700>;</span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
-</span></span></code></pre></td></tr></table></div></div><p>在<code>SocketChannelImpl</code>里看</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span></span></code></pre></td></tr></table></div></div><p>在<code>SocketChannelImpl</code>里看</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#000;font-weight:700>protected</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>implConfigureBlocking</span><span style=color:#000;font-weight:700>(</span><span style=color:#458;font-weight:700>boolean</span> block<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> IOException <span style=color:#000;font-weight:700>{</span>
 </span></span><span style=display:flex><span>        IOUtil<span style=color:#000;font-weight:700>.</span><span style=color:teal>configureBlocking</span><span style=color:#000;font-weight:700>(</span>fd<span style=color:#000;font-weight:700>,</span> block<span style=color:#000;font-weight:700>);</span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
 </span></span><span style=display:flex><span>    
-</span></span></code></pre></td></tr></table></div></div><p>将这个操作又交给了<code>IOUtil</code>的<code>configureBlocking</code>, 同时还传入了我们上面创建的socket fd. 打开<code>IOUtil</code>一看</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span></span></code></pre></td></tr></table></div></div><p>将这个操作又交给了<code>IOUtil</code>的<code>configureBlocking</code>, 同时还传入了我们上面创建的socket fd. 打开<code>IOUtil</code>一看</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>static</span> <span style=color:#000;font-weight:700>native</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>configureBlocking</span><span style=color:#000;font-weight:700>(</span>FileDescriptor fd<span style=color:#000;font-weight:700>,</span>
 </span></span><span style=display:flex><span>                                                <span style=color:#458;font-weight:700>boolean</span> blocking<span style=color:#000;font-weight:700>)</span>
 </span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>throws</span> IOException<span style=color:#000;font-weight:700>;</span>
-</span></span></code></pre></td></tr></table></div></div><p>还是要找c的实现，打开<code>IOUtil.c</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span></span></code></pre></td></tr></table></div></div><p>还是要找c的实现，打开<code>IOUtil.c</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c data-lang=c><span style=display:flex><span>JNIEXPORT <span style=color:#458;font-weight:700>void</span> JNICALL
 </span></span><span style=display:flex><span><span style=color:#900;font-weight:700>Java_sun_nio_ch_IOUtil_configureBlocking</span>(JNIEnv <span style=color:#000;font-weight:700>*</span>env, jclass clazz,
 </span></span><span style=display:flex><span>                                         jobject fdo, jboolean blocking)
@@ -209,22 +209,22 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>return</span> (flags <span style=color:#000;font-weight:700>==</span> newflags) <span style=color:#000;font-weight:700>?</span> <span style=color:#099>0</span> <span style=color:#000;font-weight:700>:</span> <span style=color:#900;font-weight:700>fcntl</span>(fd, F_SETFL, newflags);
 </span></span><span style=display:flex><span>}
-</span></span></code></pre></td></tr></table></div></div><p>可以看到，JVM也是靠<code>fcntl</code>来实现非阻塞的，所以服务端编程知道一些底层的API还是有价值的和有必要的。</p><h2 id=23-socketchannel的读写>2.3 SocketChannel的读写</h2><p>那么SocketChannel是如何读写呢，打开<code>SocketChannelImpl</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span></span></code></pre></td></tr></table></div></div><p>可以看到，JVM也是靠<code>fcntl</code>来实现非阻塞的，所以服务端编程知道一些底层的API还是有价值的和有必要的。</p><h2 id=23-socketchannel的读写>2.3 SocketChannel的读写</h2><p>那么SocketChannel是如何读写呢，打开<code>SocketChannelImpl</code></p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>int</span> <span style=color:#900;font-weight:700>read</span><span style=color:#000;font-weight:700>(</span>ByteBuffer buf<span style=color:#000;font-weight:700>)</span> <span style=color:#000;font-weight:700>throws</span> IOException <span style=color:#000;font-weight:700>{</span>
 </span></span><span style=display:flex><span>      <span style=color:#000;font-weight:700>...</span>
 </span></span><span style=display:flex><span>      <span style=color:#998;font-style:italic>// n表示读到的数据长度
@@ -241,61 +241,61 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 </span></span><span style=display:flex><span>      <span style=color:#000;font-weight:700>}</span>
 </span></span><span style=display:flex><span>      <span style=color:#000;font-weight:700>...</span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
-</span></span></code></pre></td></tr></table></div></div><p>读交给了<code>IOUtil</code>的<code>read</code>方法</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span></span></code></pre></td></tr></table></div></div><p>读交给了<code>IOUtil</code>的<code>read</code>方法</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>    <span style=color:#000;font-weight:700>static</span> <span style=color:#458;font-weight:700>int</span> <span style=color:#900;font-weight:700>read</span><span style=color:#000;font-weight:700>(</span>FileDescriptor fd<span style=color:#000;font-weight:700>,</span> ByteBuffer dst<span style=color:#000;font-weight:700>,</span> <span style=color:#458;font-weight:700>long</span> position<span style=color:#000;font-weight:700>,</span>
 </span></span><span style=display:flex><span>                    NativeDispatcher nd<span style=color:#000;font-weight:700>)</span>
 </span></span><span style=display:flex><span>        <span style=color:#000;font-weight:700>throws</span> IOException
@@ -358,7 +358,7 @@ socket API, 那么进程或者线程会在这里<strong>阻塞</strong>，浪费
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N5MSKS0SN8"></script>
 <script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-N5MSKS0SN8",{anonymize_ip:!1})}</script></div><div id=secondary><section class=widget><form id=search action=https://www.sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1><input type=text name=q maxlength=20 placeholder=Search>
 <input type=hidden name=sitesearch value=https://www.sound2gd.wang/>
-<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
+<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/d2adf54d/ title="Stable Diffusion咒语整理">Stable Diffusion咒语整理</a></li><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
 <a href=https://www.sound2gd.wang/tags/clojure/>Clojure</a>
 <a href=https://www.sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
 <a href=https://www.sound2gd.wang/tags/jvm-java/>JVM JAVA</a>

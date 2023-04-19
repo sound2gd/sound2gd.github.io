@@ -4,35 +4,35 @@
 <a href=https://www.sound2gd.wang/life/ title=学习>学习</a>
 <a href=https://www.sound2gd.wang/about/ title=关于>关于</a></nav></div></div></div></header><div id=body><div class=container><div class=col-group><div class=col-8 id=main><div class=res-cons><article class=post><header><h1 class=post-title>JVM拾遗(4): Java对象的创建及内存布局</h1></header><date class="post-meta meta-date">2019年2月15日</date><div class=post-content><p>上一节<a href=/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/>JVM拾遗-3-类装载机制</a>讲了JVM如何将类装载到虚拟机以供后续使用
 那么JVM是如何创建类的实例呢?该对象是如何分配内存的?</p><h1 id=1-实例化>1. 实例化</h1><h2 id=11-创建对象的方式>1.1 创建对象的方式</h2><p>Java对象的创建, 有多种方式，最简单就是<code>new XXClass</code>, 还可以通过<code>反射</code>，<code>xx.clone()</code>,<code>反序列化</code>以及黑科技<code>Unsafe.allocateInstance</code>等方法.</p><p><code>new</code>和反射创建对象实例的时候，会初始化实例字段.</p><p>如果类没有构造器，会默认添加构造器，并且编译成<code>&lt;init></code>方法.
-默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p><p>如下类:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+默认生成的构造器里，如果父类有无参构造器, 会隐式递归调用父类的构造器.</p><p>如下类:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-java data-lang=java><span style=display:flex><span>  <span style=color:#000;font-weight:700>public</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>TestClass</span> <span style=color:#000;font-weight:700>{</span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>public</span> <span style=color:#458;font-weight:700>void</span> <span style=color:#900;font-weight:700>test</span><span style=color:#000;font-weight:700>()</span> <span style=color:#000;font-weight:700>{</span>
 </span></span><span style=display:flex><span>      TestClass t <span style=color:#000;font-weight:700>=</span> <span style=color:#000;font-weight:700>new</span> TestClass<span style=color:#000;font-weight:700>();</span>
 </span></span><span style=display:flex><span>    <span style=color:#000;font-weight:700>}</span>
 </span></span><span style=display:flex><span>  <span style=color:#000;font-weight:700>}</span>
-</span></span></code></pre></td></tr></table></div></div><p>生成的字节码如下(用<code>javap -v TestClass</code>可以得到):</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span></span></code></pre></td></tr></table></div></div><p>生成的字节码如下(用<code>javap -v TestClass</code>可以得到):</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>public TestClass<span style=color:#000;font-weight:700>()</span>;
 </span></span><span style=display:flex><span>    descriptor: <span style=color:#000;font-weight:700>()</span>V
 </span></span><span style=display:flex><span>    flags: ACC_PUBLIC
@@ -54,40 +54,40 @@
 </span></span><span style=display:flex><span>         8: <span style=color:#000;font-weight:700>return</span>
 </span></span></code></pre></td></tr></table></div></div><p>那两行<code>invokespecial</code>指令是用来调用类构造器或者类的私有方法的.</p><p>可以看到，<code>TestClass</code>类添加了默认的构造器,生成了<code>&lt;init>方法</code>，同时调用了<code>Object</code>类的<code>&lt;init></code>方法，也就是<code>java.lang.Object</code>类的构造方法.
 也可以显式调用父类的构造器, 使用<code>super(a,b,c)</code>这样的形式即可</p><h2 id=12-虚拟机如何处理new指令>1.2 虚拟机如何处理new指令</h2><p><code>new</code>指令会实例化一个对象, JVM如何处理<code>new</code>指令生成具体的对象并不是规范的一部分，所以这里指的JVM实现指的是<code>Hotspot</code>的实现</p><p>下面是<code>new</code>指令实例化对象的过程:</p><ol><li>JVM会判断对应的类是否被加载，链接，初始化, 判断的依据是根据符号引用找方法区是否有类的数据.如果没有需要进行类的加载过程</li><li>为对象分配内存, 有2种方式</li></ol><ul><li>指针提升(bump pointer, 注意没翻译错), 如果<code>堆内存</code>是规整的, 那么只需要把指针移动一个对象大小的距离就完成了分配</li><li>空闲列表(free list), 如果<code>堆内存</code>是不连续的，碎片很多, JVM会维护一个可用内存队列, 从中查出可用内存分配给对象.
-具体使用哪种方式依据堆内存的情况而定，而堆内存的情况很大受到<code>gc</code>的影响，后面会细谈</li></ul><ol start=3><li>初始化内存, JVM会将分配到的内存初始化为0值.</li><li>设置对象的元数据信息到<code>对象头</code>, 例如对象的<code>hashcode</code>,<code>gc分带年龄</code>,<code>偏向锁状态</code>等信息</li></ol><p>一般来讲，<code>new</code>指令后面都会跟着<code>invokespecial</code>来执行<code>&lt;init></code>方法，也就是执行类构造器里的逻辑.</p><h3 id=对象创建的并发安全问题>对象创建的并发安全问题</h3><p>JVM处理对象创建的并发安全一般有2种方法:</p><ol><li><code>CAS</code>操作加上失败重试</li><li>内存分配的动作按照线程划分在不同的内存空间区域进行，这些预先分配的内存仅属于该线程私有，也称为<code>本地线程分配缓冲(Thread Local Allocation Buffer, TLAB)</code>, 可以通过<code>-XX:UseTLAB</code>来设置</li></ol><h1 id=2-对象的内存布局>2. 对象的内存布局</h1><p>对象的内存布局也不是JVM规范的一部分，属于实现的细节，<code>Hotspot</code>将对象分成3部分,分别是:</p><ol><li>对象头(Object Header)</li><li>实例数据(Instance Data)</li><li>对齐填充(Padding)</li></ol><h2 id=21-object-header>2.1 Object Header</h2><p>对象头由<code>标记字段(Mark Word)</code>和<code>类型指针(Klass Pointer)</code>组成</p><p><code>Mark Word</code>用于存储该对象的运行时数据, 包括:</p><ul><li>对象<code>hashcode</code>, <code>gc</code>分代年龄</li><li>锁记录指针, 重量级锁指针</li><li>偏向线程id, 偏向时间戳</li></ul><p>在64位的虚拟机上<code>标记字段</code>一般是8个字节，<code>类型指针</code>也是8个字节，总共就是16个字节.</p><p>可以使用<code>-XX:UseCompressedOops</code>来开启压缩指针, 以减少对象的内存使用量, 默认是开启的.</p><p>而<code>类型指针</code>指向的是对象的元数据信息, 也就是对象所属类的信息.</p><h3 id=hotspot实现>HotSpot实现</h3><p><code>Hotspot</code>一般用<code>OOP-Klass</code>二分模型来实现, <code>OOP(Ordinary Object Pointer)</code>是普通对象指针，<code>Klass</code>用来描述具体的类型.</p><p>以下是openjdk的实现:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+具体使用哪种方式依据堆内存的情况而定，而堆内存的情况很大受到<code>gc</code>的影响，后面会细谈</li></ul><ol start=3><li>初始化内存, JVM会将分配到的内存初始化为0值.</li><li>设置对象的元数据信息到<code>对象头</code>, 例如对象的<code>hashcode</code>,<code>gc分带年龄</code>,<code>偏向锁状态</code>等信息</li></ol><p>一般来讲，<code>new</code>指令后面都会跟着<code>invokespecial</code>来执行<code>&lt;init></code>方法，也就是执行类构造器里的逻辑.</p><h3 id=对象创建的并发安全问题>对象创建的并发安全问题</h3><p>JVM处理对象创建的并发安全一般有2种方法:</p><ol><li><code>CAS</code>操作加上失败重试</li><li>内存分配的动作按照线程划分在不同的内存空间区域进行，这些预先分配的内存仅属于该线程私有，也称为<code>本地线程分配缓冲(Thread Local Allocation Buffer, TLAB)</code>, 可以通过<code>-XX:UseTLAB</code>来设置</li></ol><h1 id=2-对象的内存布局>2. 对象的内存布局</h1><p>对象的内存布局也不是JVM规范的一部分，属于实现的细节，<code>Hotspot</code>将对象分成3部分,分别是:</p><ol><li>对象头(Object Header)</li><li>实例数据(Instance Data)</li><li>对齐填充(Padding)</li></ol><h2 id=21-object-header>2.1 Object Header</h2><p>对象头由<code>标记字段(Mark Word)</code>和<code>类型指针(Klass Pointer)</code>组成</p><p><code>Mark Word</code>用于存储该对象的运行时数据, 包括:</p><ul><li>对象<code>hashcode</code>, <code>gc</code>分代年龄</li><li>锁记录指针, 重量级锁指针</li><li>偏向线程id, 偏向时间戳</li></ul><p>在64位的虚拟机上<code>标记字段</code>一般是8个字节，<code>类型指针</code>也是8个字节，总共就是16个字节.</p><p>可以使用<code>-XX:UseCompressedOops</code>来开启压缩指针, 以减少对象的内存使用量, 默认是开启的.</p><p>而<code>类型指针</code>指向的是对象的元数据信息, 也就是对象所属类的信息.</p><h3 id=hotspot实现>HotSpot实现</h3><p><code>Hotspot</code>一般用<code>OOP-Klass</code>二分模型来实现, <code>OOP(Ordinary Object Pointer)</code>是普通对象指针，<code>Klass</code>用来描述具体的类型.</p><p>以下是openjdk的实现:</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c++ data-lang=c++><span style=display:flex><span><span style=color:#998;font-style:italic>// hotspot/src/share/vm/oops/oop.hpp
 </span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span><span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>oopDesc</span> {
 </span></span><span style=display:flex><span>  <span style=color:#000;font-weight:700>friend</span> <span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>VMStructs</span>;
@@ -124,70 +124,70 @@
 </span></span><span style=display:flex><span>  ...<span style=color:#a61717;background-color:#e3d2d2>省略非关键代码</span>...
 </span></span></code></pre></td></tr></table></div></div><p>其中<code>OOP</code>的实现就是<code>instanceOopDesc</code>和<code>arrayOopDesc</code>,分别是普通对象实现和数组对象实现, 均继承自上面的<code>oopDesc</code>,
 数组对象比普通对象多一个长度字段.
-<code>oopDesc</code>存放有<code>_mark</code>和<code>_metadata</code>, <code>_mark</code>就是标记字段(mark word), 而<code>_metadata</code>里就有一个指针指向<code>Klass</code>.</p><p>限于篇幅，<code>markOop.hpp</code>的代码就不贴了，大致就是上面提到的信息。</p><p>类型指针(上面<code>_meta</code>里<code>__klass</code>指针)指向的<code>Klass</code>信息, 即类在JVM的真身, 看看就好.</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+<code>oopDesc</code>存放有<code>_mark</code>和<code>_metadata</code>, <code>_mark</code>就是标记字段(mark word), 而<code>_metadata</code>里就有一个指针指向<code>Klass</code>.</p><p>限于篇幅，<code>markOop.hpp</code>的代码就不贴了，大致就是上面提到的信息。</p><p>类型指针(上面<code>_meta</code>里<code>__klass</code>指针)指向的<code>Klass</code>信息, 即类在JVM的真身, 看看就好.</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-c++ data-lang=c++><span style=display:flex><span><span style=color:#998;font-style:italic>// hotspot/src/share/vm/oops/instanceKlass.hpp
 </span></span></span><span style=display:flex><span><span style=color:#998;font-style:italic></span><span style=color:#000;font-weight:700>class</span> <span style=color:#458;font-weight:700>InstanceKlass</span><span style=color:#000;font-weight:700>:</span> <span style=color:#000;font-weight:700>public</span> Klass {
 </span></span><span style=display:flex><span>  ...
@@ -271,7 +271,7 @@ class Metadata : public MetaspaceObj {
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N5MSKS0SN8"></script>
 <script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-N5MSKS0SN8",{anonymize_ip:!1})}</script></div><div id=secondary><section class=widget><form id=search action=https://www.sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1><input type=text name=q maxlength=20 placeholder=Search>
 <input type=hidden name=sitesearch value=https://www.sound2gd.wang/>
-<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
+<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/d2adf54d/ title="Stable Diffusion咒语整理">Stable Diffusion咒语整理</a></li><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
 <a href=https://www.sound2gd.wang/tags/clojure/>Clojure</a>
 <a href=https://www.sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
 <a href=https://www.sound2gd.wang/tags/jvm-java/>JVM JAVA</a>

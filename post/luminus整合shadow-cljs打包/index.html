@@ -3,46 +3,46 @@
 <a href=https://www.sound2gd.wang/archives/ title=归档>归档</a>
 <a href=https://www.sound2gd.wang/life/ title=学习>学习</a>
 <a href=https://www.sound2gd.wang/about/ title=关于>关于</a></nav></div></div></div></header><div id=body><div class=container><div class=col-group><div class=col-8 id=main><div class=res-cons><article class=post><header><h1 class=post-title>luminus整合shadow-cljs打包</h1></header><date class="post-meta meta-date">2018年3月21日</date><div class=post-content><p><a href=https://github.com/thheller/shadow-cljs>shadow-cljs</a>是新一代的cljs打包工具，比起以前的cljsbuild和figwheel的优势主要是:</p><ol><li>支持直接引用npm依赖, 以前还需要使用<code>cljsjs</code>转一次，不仅麻烦而且还是过时的</li><li>和webpack类似的代码分割, 依赖</li></ol><p>当然，<strong>cljs+css代码重载</strong>是最基本的，而且构建速度也足够快</p><p>基于这些特点，打算采用<code>shadow-cljs</code>来编译cljs
-想法是好的，实际运行的发现现实总是骨感的&mldr;</p><h2 id=1-安装shadow-cljs>1. 安装shadow-cljs</h2><p>我先创建了一个<code>luminus</code>的应用，然后按照shadow-cljs官网所说，直接安装跑起来</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+想法是好的，实际运行的发现现实总是骨感的&mldr;</p><h2 id=1-安装shadow-cljs>1. 安装shadow-cljs</h2><p>我先创建了一个<code>luminus</code>的应用，然后按照shadow-cljs官网所说，直接安装跑起来</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>lein new luminus shadow-gen
 </span></span><span style=display:flex><span><span style=color:#0086b3>cd</span> shadow-gen
 </span></span><span style=display:flex><span>yarn add shadow-cljs
 </span></span><span style=display:flex><span>shadow-cljs init
-</span></span></code></pre></td></tr></table></div></div><h2 id=2-shadow-cljs打包配置>2. shadow-cljs打包配置</h2><p>然后我创建一个Build配置</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span></span></code></pre></td></tr></table></div></div><h2 id=2-shadow-cljs打包配置>2. shadow-cljs打包配置</h2><p>然后我创建一个Build配置</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-clojure data-lang=clojure><span style=display:flex><span><span style=color:#998;font-style:italic>;; shadow-cljs configuration</span>
 </span></span><span style=display:flex><span>{<span style=color:#990073>:source-paths</span>
 </span></span><span style=display:flex><span> [<span style=color:#d14>&#34;src/cljs&#34;</span> <span style=color:#d14>&#34;env/dev/cljs/&#34;</span>]
@@ -76,15 +76,15 @@
 </span></span><span style=display:flex><span>        }}
 </span></span><span style=display:flex><span> }
 </span></span></code></pre></td></tr></table></div></div><p>开了<code>day8.re-frame-10x.preload</code>半天页面一直崩，问了下作者thheller发现reframe的dev工具有bug,现在还无解&mldr;
-然后<code>lein repl</code>,start之后，访问一下<code>localhost:3000</code>, 一开始是好的，后来改下代码hmr之后发现果然崩了。。</p><p>打开app.cljs一看，由于<code>figwheel-no-load</code>元数据, figwheel每次重载都会避开app.cljs,</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
+然后<code>lein repl</code>,start之后，访问一下<code>localhost:3000</code>, 一开始是好的，后来改下代码hmr之后发现果然崩了。。</p><p>打开app.cljs一看，由于<code>figwheel-no-load</code>元数据, figwheel每次重载都会避开app.cljs,</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-clojure data-lang=clojure><span style=display:flex><span>(<span style=color:#000;font-weight:700>ns </span><span style=color:#000;font-weight:700>^</span><span style=color:#990073>:figwheel-no-load</span> <span style=color:teal>shadow-gen.app</span>
 </span></span><span style=display:flex><span>  (<span style=color:#990073>:require</span> [<span style=color:teal>shadow-gen.core</span> <span style=color:#990073>:as</span> <span style=color:teal>core</span>]
 </span></span><span style=display:flex><span>            [<span style=color:teal>devtools.core</span> <span style=color:#990073>:as</span> <span style=color:teal>devtools</span>]))
@@ -96,12 +96,12 @@
 </span></span><span style=display:flex><span>(<span style=color:#900;font-weight:700>core/init!</span>)
 </span></span></code></pre></td></tr></table></div></div><p>shadow-gen不会skip,<strong>每次都会reload整个ns</strong>,然后init!的时候会重复创建goog.History对象，就崩了，
 跟作者提了下，作者当天就把这个功能加上去了。。。</p><p>后来请教了下赵宇少侠，发现把core.cljs里的init!导出，然后在html引的时候<strong>直接调用core里的init</strong>也是一种很好的解决方案,
-然后把entry改成core.cljs,每次重载的时候调用edn里配置的<code>:after-load</code>去mount就好了</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+然后把entry改成core.cljs,每次重载的时候调用edn里配置的<code>:after-load</code>去mount就好了</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-html data-lang=html><span style=display:flex><span>    {% script &#34;/js/app.js&#34; %}
 </span></span><span style=display:flex><span>    &lt;<span style=color:navy>script</span> <span style=color:teal>type</span><span style=color:#000;font-weight:700>=</span><span style=color:#d14>&#34;text/javascript&#34;</span>&gt;
 </span></span><span style=display:flex><span>     <span style=color:#000;font-weight:700>var</span> context <span style=color:#000;font-weight:700>=</span> <span style=color:#d14>&#34;{{servlet-context}}&#34;</span>;
@@ -112,13 +112,13 @@
 一开始我是先编译cljs的</p><pre><code>shadow-cljs release app
 </code></pre><p>然后发现leiningen在编译的时候，直接会清空target目录&mldr;
 翻了下leiningen文档，发现在pretask里可以指定任务顺序，我的是先编译java,然后编译clj,最后使用<code>shadow.cljs.devtools.cli</code>编译cljs
-lein里面javac可以编译java,compile编译clj, 去掉原来的<code>:cljsbuild</code>最后配置是这样</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
-</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+lein里面javac可以编译java,compile编译clj, 去掉原来的<code>:cljsbuild</code>最后配置是这样</p><div class=highlight><div style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-clojure data-lang=clojure><span style=display:flex><span>{<span style=color:#990073>:uberjar</span> {<span style=color:#990073>:omit-source</span> <span style=color:teal>true</span>
 </span></span><span style=display:flex><span>             <span style=color:#990073>:main</span> <span style=color:#000;font-weight:700>^</span><span style=color:#990073>:skip-aot</span> <span style=color:teal>shadow-gen.core</span>
 </span></span><span style=display:flex><span>             <span style=color:#990073>:prep-tasks</span> [<span style=color:#d14>&#34;javac&#34;</span> <span style=color:#d14>&#34;compile&#34;</span> [<span style=color:#d14>&#34;run&#34;</span> <span style=color:#d14>&#34;-m&#34;</span> <span style=color:#d14>&#34;shadow.cljs.devtools.cli&#34;</span> <span style=color:#d14>&#34;release&#34;</span> <span style=color:#d14>&#34;app&#34;</span>]]
@@ -133,7 +133,7 @@ lein里面javac可以编译java,compile编译clj, 去掉原来的<code>:cljsbuil
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N5MSKS0SN8"></script>
 <script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-N5MSKS0SN8",{anonymize_ip:!1})}</script></div><div id=secondary><section class=widget><form id=search action=https://www.sound2gd.wang/search/ method=get accept-charset=utf-8 target=_blank _lpchecked=1><input type=text name=q maxlength=20 placeholder=Search>
 <input type=hidden name=sitesearch value=https://www.sound2gd.wang/>
-<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9010-jvm%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98%E5%88%A9%E7%94%A8%E6%94%B9%E8%BF%9B-directbuffer%E8%AF%A6%E8%A7%A3/ title="Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解">Java NIO分析(10): JVM堆外内存利用改进: DirectBuffer详解</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
+<button type=submit class="submit icon-search"></button></form></section><section class=widget><h3 class=widget-title>最近文章</h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/post/d2adf54d/ title="Stable Diffusion咒语整理">Stable Diffusion咒语整理</a></li><li><a href=https://www.sound2gd.wang/post/bcd1a91c/ title=盘点rust写的好用命令行工具>盘点rust写的好用命令行工具</a></li><li><a href=https://www.sound2gd.wang/post/556f376d/ title=2022年Clojure技术栈推荐>2022年Clojure技术栈推荐</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%975-%E5%AF%B9%E8%B1%A1%E5%A4%A7%E5%B0%8F%E8%AE%A1%E7%AE%97/ title="JVM拾遗(5): 对象大小计算">JVM拾遗(5): 对象大小计算</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%974-java%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%88%9B%E5%BB%BA%E5%8F%8A%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80/ title="JVM拾遗(4): Java对象的创建及内存布局">JVM拾遗(4): Java对象的创建及内存布局</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%973-%E7%B1%BB%E8%A3%85%E8%BD%BD%E6%9C%BA%E5%88%B6/ title="JVM拾遗(3): 类装载机制">JVM拾遗(3): 类装载机制</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%972-%E5%B9%B3%E5%8F%B0%E6%97%A0%E5%85%B3%E6%80%A7%E5%9F%BA%E7%9F%B3%E4%B9%8Bclass%E8%A7%A3%E6%9E%90/ title="JVM拾遗(2): 平台无关性基石之Class解析">JVM拾遗(2): 平台无关性基石之Class解析</a></li><li><a href=https://www.sound2gd.wang/post/jvm%E6%8B%BE%E9%81%971-%E4%B8%87%E7%B1%B3%E9%AB%98%E7%A9%BA%E7%9C%8Bjvm/ title="JVM拾遗(1): 万米高空看JVM">JVM拾遗(1): 万米高空看JVM</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9012-nio%E6%80%BB%E7%BB%93/ title="Java NIO分析(12): NIO总结">Java NIO分析(12): NIO总结</a></li><li><a href=https://www.sound2gd.wang/post/java-nio%E5%88%86%E6%9E%9011-%E9%9B%B6%E6%8B%B7%E8%B4%9D%E6%8A%80%E6%9C%AF%E4%BB%A5%E5%8F%8Anio%E7%9A%84%E6%94%AF%E6%8C%81/ title="Java NIO分析(11): 零拷贝技术以及NIO的支持">Java NIO分析(11): 零拷贝技术以及NIO的支持</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/categories/>分类</a></h3><ul class=widget-list><li><a href=https://www.sound2gd.wang/categories/clojure/>Clojure (1)</a></li><li><a href=https://www.sound2gd.wang/categories/%E5%B9%B4%E7%BB%88%E6%80%BB%E7%BB%93/>年终总结 (1)</a></li></ul></section><section class=widget><h3 class=widget-title><a href=/tags/>标签</a></h3><div class=tagcloud><a href=https://www.sound2gd.wang/tags/2021/>2021</a>
 <a href=https://www.sound2gd.wang/tags/clojure/>Clojure</a>
 <a href=https://www.sound2gd.wang/tags/java-jvm/>JAVA JVM</a>
 <a href=https://www.sound2gd.wang/tags/jvm-java/>JVM JAVA</a>

@@ -1,10 +1,10 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Chris的博客</title><link>https://www.sound2gd.wang/</link><description>Recent content on Chris的博客</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Tue, 05 Jul 2022 08:20:04 +0800</lastBuildDate><atom:link href="https://www.sound2gd.wang/index.xml" rel="self" type="application/rss+xml"/><item><title>盘点rust写的好用命令行工具</title><link>https://www.sound2gd.wang/post/bcd1a91c/</link><pubDate>Tue, 05 Jul 2022 08:20:04 +0800</pubDate><guid>https://www.sound2gd.wang/post/bcd1a91c/</guid><description>&lt;p>2022年了，有很多古老的命令行工具已经过时了，可以用新时代语言rust写的对标来平替.&lt;/p>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Chris的博客</title><link>https://www.sound2gd.wang/</link><description>Recent content on Chris的博客</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Wed, 19 Apr 2023 14:50:58 +0800</lastBuildDate><atom:link href="https://www.sound2gd.wang/index.xml" rel="self" type="application/rss+xml"/><item><title>Stable Diffusion咒语整理</title><link>https://www.sound2gd.wang/post/d2adf54d/</link><pubDate>Wed, 19 Apr 2023 14:50:58 +0800</pubDate><guid>https://www.sound2gd.wang/post/d2adf54d/</guid><description>&lt;p>最近做了不少Stable Diffusion相关的尝试，这里整理一些资源情况&lt;/p></description></item><item><title>盘点rust写的好用命令行工具</title><link>https://www.sound2gd.wang/post/bcd1a91c/</link><pubDate>Tue, 05 Jul 2022 08:20:04 +0800</pubDate><guid>https://www.sound2gd.wang/post/bcd1a91c/</guid><description>&lt;p>2022年了，有很多古老的命令行工具已经过时了，可以用新时代语言rust写的对标来平替.&lt;/p>
 &lt;h1 id="1-常用系列">1. 常用系列&lt;/h1>
 &lt;h2 id="11-目录查看-ls---exa">1.1 目录查看 ls -&amp;gt; exa&lt;/h2>
 &lt;p>自带各种颜色高亮匹配的ls, 能识别出符号链接、扩展属性、git、各类文件类型等。&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
 &lt;/span>&lt;/code>&lt;/pre>&lt;/td>
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>$ brew install exa
@@ -21,7 +21,7 @@
 &lt;p>gayhub地址: &lt;a href="https://github.com/BurntSushi/ripgrep">ripgrep&lt;/a>&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
 &lt;/span>&lt;/code>&lt;/pre>&lt;/td>
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>$ brew install ripgrep
@@ -138,7 +138,7 @@ Unix提供了5种不同的I/O模型，分别是&lt;/p>
 mac下通过&lt;a href="https://brew.sh">HomeBrew&lt;/a>可以快速安装最新版clojure,自带clj命令行工具&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
 &lt;/span>&lt;/code>&lt;/pre>&lt;/td>
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-sh" data-lang="sh">&lt;span style="display:flex;">&lt;span>brew install clojure
@@ -147,9 +147,9 @@ mac下通过&lt;a href="https://brew.sh">HomeBrew&lt;/a>可以快速安装最新
 &lt;/div>&lt;p>linux平台按照&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
-&lt;/span>&lt;span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
 &lt;/span>&lt;/code>&lt;/pre>&lt;/td>
 &lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-sh" data-lang="sh">&lt;span style="display:flex;">&lt;span>curl -O https://download.clojure.org/install/linux-install.sh
